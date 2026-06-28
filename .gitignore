@@ -72,3 +72,13 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# AI Agents & IDE / Local Configs
+.agents/
+.gemini/
+.vscode/
+
+# Environment variables & secrets
+.env
+.env.*
+*.log
