@@ -28,14 +28,18 @@ import rikka.shizuku.Shizuku
 
 class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), Shizuku.OnRequestPermissionResultListener {
 
+    companion object {
+        var autoHibernationEnabled = false
+        val autoHibernationTargets = mutableSetOf<String>()
+        var quickActionNotifEnabled = false
+        val postponedPackages = mutableSetOf<String>()
+    }
+
     private var permissionPromise: Promise? = null
-    private var autoHibernationEnabled = false
-    private val autoHibernationTargets = mutableSetOf<String>()
     private var screenOffReceiver: BroadcastReceiver? = null
-    private var quickActionNotifEnabled = false
     private var quickActionReceiver: BroadcastReceiver? = null
-    private val postponedPackages = mutableSetOf<String>()
     private var pollingHandler: Handler? = null
+    private val iconCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val notificationHelper by lazy { KillerNotificationHelper(reactApplicationContext) }
 
     init {
@@ -125,25 +129,28 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                 val isGcm = packageManager.checkPermission("com.google.android.c2dm.permission.RECEIVE", packageName) == PackageManager.PERMISSION_GRANTED
                 val isStopped = (app.flags and ApplicationInfo.FLAG_STOPPED) != 0
 
-                var iconBase64 = ""
-                try {
-                    val drawable = packageManager.getApplicationIcon(app)
-                    val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
-                        drawable.bitmap
-                    } else {
-                        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(bmp)
-                        drawable.setBounds(0, 0, canvas.width, canvas.height)
-                        drawable.draw(canvas)
-                        bmp
+                var iconBase64 = iconCache[packageName] ?: ""
+                if (iconBase64.isEmpty()) {
+                    try {
+                        val drawable = packageManager.getApplicationIcon(app)
+                        val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                            drawable.bitmap
+                        } else {
+                            val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                            val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            val canvas = Canvas(bmp)
+                            drawable.setBounds(0, 0, canvas.width, canvas.height)
+                            drawable.draw(canvas)
+                            bmp
+                        }
+                        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 96, 96, true)
+                        val stream = ByteArrayOutputStream()
+                        scaledBitmap.compress(Bitmap.CompressFormat.PNG, 80, stream)
+                        iconBase64 = "data:image/png;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                        iconCache[packageName] = iconBase64
+                    } catch (e: Exception) {
                     }
-                    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 96, 96, true)
-                    val stream = ByteArrayOutputStream()
-                    scaledBitmap.compress(Bitmap.CompressFormat.PNG, 80, stream)
-                    iconBase64 = "data:image/png;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-                } catch (e: Exception) {
                 }
 
                 val appMap = Arguments.createMap()
@@ -225,6 +232,8 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
         for (i in 0 until packages.size()) {
             packages.getString(i)?.let { autoHibernationTargets.add(it) }
         }
+        val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("autoHibernationTargets", autoHibernationTargets).putStringSet("postponedPackages", postponedPackages).apply()
         if (enabled && screenOffReceiver == null) {
             screenOffReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
@@ -279,9 +288,9 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                                             if (process.waitFor() == 0) count++
                                         } catch (e: Exception) {}
                                     }
-                                    Thread.sleep(300)
+                                    Thread.sleep(700)
                                     Handler(Looper.getMainLooper()).post {
-                                        Toast.makeText(reactApplicationContext, "$count aplikasi berhasil dibekukan!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(reactApplicationContext, "$count aplikasi berhasil di-kill!", Toast.LENGTH_SHORT).show()
                                         try {
                                             reactApplicationContext
                                                 .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -310,9 +319,9 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                                     method.isAccessible = true
                                     val process = method.invoke(null, arrayOf("sh", "-c", "am force-stop $targetPkg"), null, null) as Process
                                     process.waitFor()
-                                    Thread.sleep(300)
+                                    Thread.sleep(700)
                                     Handler(Looper.getMainLooper()).post {
-                                        Toast.makeText(reactApplicationContext, "$targetName dibekukan!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(reactApplicationContext, "$targetName berhasil di-kill!", Toast.LENGTH_SHORT).show()
                                         try {
                                             reactApplicationContext
                                                 .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -340,15 +349,29 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             pollingHandler = Handler(Looper.getMainLooper())
         }
         pollingHandler?.removeCallbacksAndMessages(null)
+        val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("quickActionNotifEnabled", enabled).apply()
+        val serviceIntent = Intent(reactApplicationContext, KillerForegroundService::class.java)
         if (enabled) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try {
+                    reactApplicationContext.startForegroundService(serviceIntent)
+                } catch (e: Exception) {
+                    reactApplicationContext.startService(serviceIntent)
+                }
+            } else {
+                reactApplicationContext.startService(serviceIntent)
+            }
             pollingHandler?.post(object : Runnable {
                 override fun run() {
                     if (quickActionNotifEnabled) {
                         updateNotificationDisplay(false)
-                        pollingHandler?.postDelayed(this, 3500)
+                        pollingHandler?.postDelayed(this, 200)
                     }
                 }
             })
+        } else {
+            reactApplicationContext.stopService(serviceIntent)
         }
         updateNotificationDisplay(true)
     }

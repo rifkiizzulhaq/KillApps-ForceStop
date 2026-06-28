@@ -28,12 +28,14 @@ interface AppState {
 	toggleShowSystemApps: () => void;
 	checkShizukuStatus: () => Promise<void>;
 	requestShizukuPermission: () => Promise<void>;
-	fetchApps: () => Promise<void>;
+	fetchApps: (silent?: boolean) => Promise<void>;
 	toggleSelectApp: (packageName: string) => void;
 	selectAll: (select: boolean) => void;
 	killSelectedApps: () => Promise<void>;
 	killSingleApp: (packageName: string) => Promise<void>;
 	clearKillMessage: () => void;
+	isHydrated: boolean;
+	setHydrated: (state: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -45,6 +47,8 @@ export const useAppStore = create<AppState>()(
 			isPermissionGranted: false,
 			isLoading: false,
 			isKilling: false,
+			isHydrated: false,
+			setHydrated: (state) => set({ isHydrated: state }),
 			killMessage: null,
 			currentScreen: "home",
 			hibernationList: [],
@@ -60,6 +64,8 @@ export const useAppStore = create<AppState>()(
 				longPressNavBar: false,
 				dontRemoveNotif: false,
 				hibernateSystemApps: false,
+				themeMode: "system",
+				smoothScroll: true,
 			},
 
 			setCurrentScreen: (screen) => {
@@ -67,6 +73,9 @@ export const useAppStore = create<AppState>()(
 			},
 
 			updateSetting: (key, value) => {
+				if (key === "quickActionNotif") {
+					killerService.setQuickActionNotification(value as boolean);
+				}
 				set((state) => {
 					const newSettings = { ...state.settings, [key]: value };
 					const updates: Partial<AppState> = { settings: newSettings };
@@ -122,22 +131,16 @@ export const useAppStore = create<AppState>()(
 
 					if (targetsToKill.length === 0 && ignoredCount > 0) {
 						set({
-							killMessage: `Semua ${hibernationList.length} aplikasi sudah tidur pulas (dilewati karena fitur Ignore Background-free aktif). 🍃`,
+							killMessage: `Semua ${hibernationList.length} aplikasi sudah dihentikan prosesnya (dilewati karena fitur Ignore Background-free aktif).`,
 						});
 						return;
 					}
 
 					const result = await killerService.killApps(targetsToKill);
 
-					let msgText = `Berhasil membesut ${result.success.length} aplikasi.`;
+					let msgText = `Berhasil menghentikan ${result.success.length} aplikasi.`;
 					if (ignoredCount > 0) {
-						msgText += ` (${ignoredCount} dilewati).`;
-					}
-					if (settings.smartHibernation) {
-						msgText += " 🧠 Smart Hibernation aktif.";
-					}
-					if (settings.shallowHibernation) {
-						msgText += " 🧊 Hibernasi dangkal diterapkan.";
+						msgText += ` (${ignoredCount} sudah berhenti & dilewati).`;
 					}
 
 					set({ killMessage: msgText });
@@ -164,7 +167,8 @@ export const useAppStore = create<AppState>()(
 				const isPerm = isBinder ? await killerService.checkPermission() : false;
 				set({ isShizukuActive: isBinder, isPermissionGranted: isPerm });
 				if (isPerm) {
-					await get().fetchApps();
+					const silent = get().apps.length > 0;
+					await get().fetchApps(silent);
 				}
 			},
 
@@ -180,16 +184,20 @@ export const useAppStore = create<AppState>()(
 				}
 			},
 
-			fetchApps: async () => {
+			fetchApps: async (silent = false) => {
 				try {
-					set({ isLoading: true });
+					if (!silent) {
+						set({ isLoading: true });
+					}
 					const apps = await killerService.getInstalledApps();
 					apps.sort((a, b) => a.appName.localeCompare(b.appName));
 					set({ apps });
 				} catch {
 					set({ apps: [] });
 				} finally {
-					set({ isLoading: false });
+					if (!silent) {
+						set({ isLoading: false });
+					}
 				}
 			},
 
@@ -241,7 +249,7 @@ export const useAppStore = create<AppState>()(
 					if (selectedPkgs.length === 0 && ignoredCount > 0) {
 						set({
 							killMessage:
-								"Aplikasi terpilih sudah dalam keadaan mati latar belakang (diabaikan oleh Ignore Background-free). 🍃",
+								"Aplikasi terpilih sudah dalam keadaan mati latar belakang (diabaikan oleh Ignore Background-free).",
 						});
 						return;
 					}
@@ -250,10 +258,7 @@ export const useAppStore = create<AppState>()(
 
 					let msgText = `Berhasil mematikan ${result.success.length} aplikasi.`;
 					if (ignoredCount > 0) {
-						msgText += ` (${ignoredCount} dilewati).`;
-					}
-					if (settings.smartHibernation) {
-						msgText += " 🧠 Smart mode.";
+						msgText += ` (${ignoredCount} sudah berhenti & dilewati).`;
 					}
 
 					set({
@@ -277,7 +282,7 @@ export const useAppStore = create<AppState>()(
 					set({ isKilling: true, killMessage: null });
 					const _result = await killerService.killApps([packageName]);
 					set((state) => ({
-						killMessage: `Berhasil membekukan aplikasi.`,
+						killMessage: `Berhasil menghentikan aplikasi.`,
 						apps: state.apps.map((app) =>
 							app.packageName === packageName
 								? { ...app, isStopped: true }
@@ -286,7 +291,7 @@ export const useAppStore = create<AppState>()(
 					}));
 					await get().fetchApps();
 				} catch {
-					set({ killMessage: "Gagal membekukan aplikasi." });
+					set({ killMessage: "Gagal menghentikan aplikasi." });
 				} finally {
 					set({ isKilling: false });
 				}
@@ -304,6 +309,9 @@ export const useAppStore = create<AppState>()(
 				settings: state.settings,
 				showSystemApps: state.showSystemApps,
 			}),
+			onRehydrateStorage: () => (state) => {
+				state?.setHydrated(true);
+			},
 		},
 	),
 );

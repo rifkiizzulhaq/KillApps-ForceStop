@@ -1,6 +1,8 @@
+import { Check, MoreVertical } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 
 export interface MenuOption {
 	label: string;
@@ -14,14 +16,15 @@ interface Props {
 
 export const HeaderMenu: React.FC<Props> = ({ options }) => {
 	const [visible, setVisible] = useState(false);
+	const { colors, isDark } = useTheme();
 
 	return (
 		<View>
 			<Pressable
 				onPress={() => setVisible(true)}
-				className="w-10 h-10 items-center justify-center rounded-full active:bg-slate-800"
+				className={`w-10 h-10 items-center justify-center rounded-full ${colors.secondaryBtnClass}`}
 			>
-				<Text className="text-white font-bold text-xl">⋮</Text>
+				<MoreVertical size={22} color={colors.iconColor} />
 			</Pressable>
 
 			<Modal
@@ -34,7 +37,9 @@ export const HeaderMenu: React.FC<Props> = ({ options }) => {
 					onPress={() => setVisible(false)}
 					className="flex-1 bg-black/40 justify-start items-end pt-14 pr-4"
 				>
-					<View className="bg-slate-900 border border-slate-800 rounded-2xl w-56 overflow-hidden shadow-2xl">
+					<View
+						className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl w-64 overflow-hidden`}
+					>
 						{options.map((opt, idx) => (
 							<Pressable
 								key={opt.label}
@@ -42,19 +47,41 @@ export const HeaderMenu: React.FC<Props> = ({ options }) => {
 									setVisible(false);
 									opt.onPress();
 								}}
-								className={`p-4 flex-row items-center justify-between active:bg-slate-800 ${
-									idx < options.length - 1 ? "border-b border-slate-800/60" : ""
+								className={`p-4 flex-row items-center justify-between active:opacity-70 ${
+									idx < options.length - 1
+										? `border-b ${colors.borderClass}`
+										: ""
 								}`}
 							>
 								<Text
-									className={`font-semibold text-sm ${
-										opt.active ? "text-emerald-400" : "text-slate-200"
+									className={`font-semibold text-sm flex-1 mr-3 ${
+										opt.active
+											? `${colors.textClass} font-black`
+											: colors.subTextClass
 									}`}
 								>
 									{opt.label}
 								</Text>
-								{opt.active && (
-									<Text className="text-emerald-400 font-bold">✓</Text>
+								{opt.active !== undefined && (
+									<View
+										className={`w-5 h-5 rounded border items-center justify-center ${
+											opt.active
+												? `${colors.primaryBtnClass} ${isDark ? "border-white" : "border-black"}`
+												: `${colors.borderClass} ${colors.inputBgClass}`
+										}`}
+									>
+										{opt.active && (
+											<Check
+												size={14}
+												color={
+													colors.primaryBtnTextClass === "text-black"
+														? "#000000"
+														: "#ffffff"
+												}
+												strokeWidth={3}
+											/>
+										)}
+									</View>
 								)}
 							</Pressable>
 						))}

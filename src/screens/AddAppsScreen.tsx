@@ -1,30 +1,39 @@
+import { ArrowLeft, Check, Search, X } from "lucide-react-native";
 import type React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
+	BackHandler,
 	Pressable,
-	ScrollView,
+	SectionList,
 	Text,
+	TextInput,
 	View,
 } from "react-native";
 import { AppListItem } from "../components/AppListItem";
 import { HeaderMenu } from "../components/HeaderMenu";
+import { useTheme } from "../hooks/useTheme";
 import { useAppStore } from "../stores/useAppStore";
 
 export const AddAppsScreen: React.FC = () => {
 	const currentScreen = useAppStore((state) => state.currentScreen);
 	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
 	const apps = useAppStore((state) => state.apps);
-	const hibernationList = useAppStore((state) => state.hibernationList);
 	const isLoading = useAppStore((state) => state.isLoading);
-	const showSystemApps = useAppStore((state) => state.showSystemApps);
-	const toggleShowSystemApps = useAppStore(
-		(state) => state.toggleShowSystemApps,
-	);
 	const fetchApps = useAppStore((state) => state.fetchApps);
 	const addSelectedToHibernation = useAppStore(
 		(state) => state.addSelectedToHibernation,
 	);
+	const showSystemApps = useAppStore((state) => state.showSystemApps);
+	const toggleShowSystemApps = useAppStore(
+		(state) => state.toggleShowSystemApps,
+	);
+	const hibernationList = useAppStore((state) => state.hibernationList);
+	const { colors, isDark } = useTheme();
+
+	const [searchQuery, setSearchQuery] = useState("");
+	const [debouncedQuery, setDebouncedQuery] = useState("");
+	const [isSearching, setIsSearching] = useState(false);
 
 	useEffect(() => {
 		if (currentScreen === "add_apps" && apps.length === 0) {
@@ -32,35 +41,80 @@ export const AddAppsScreen: React.FC = () => {
 		}
 	}, [currentScreen, apps.length, fetchApps]);
 
-	if (currentScreen !== "add_apps") {
-		return null;
-	}
+	useEffect(() => {
+		const onBackPress = () => {
+			setCurrentScreen("home");
+			return true;
+		};
+		const subscription = BackHandler.addEventListener(
+			"hardwareBackPress",
+			onBackPress,
+		);
+		return () => subscription.remove();
+	}, [setCurrentScreen]);
 
-	const filteredApps = apps.filter(
-		(app) =>
-			!hibernationList.includes(app.packageName) &&
-			(showSystemApps || !app.isSystemApp),
-	);
-	const runningApps = filteredApps.filter((app) => !app.isStopped);
-	const otherApps = filteredApps.filter((app) => app.isStopped);
-	const selectedCount = filteredApps.filter((app) => app.isSelected).length;
+	useEffect(() => {
+		setIsSearching(true);
+		const timer = setTimeout(() => {
+			setDebouncedQuery(searchQuery);
+			setIsSearching(false);
+		}, 250);
+		return () => clearTimeout(timer);
+	}, [searchQuery]);
+
+	const runningApps = apps
+		.filter((app) => !hibernationList.includes(app.packageName))
+		.filter((app) => (showSystemApps ? true : !app.isSystemApp))
+		.filter((app) => !app.isStopped)
+		.filter(
+			(app) =>
+				app.appName.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+				app.packageName.toLowerCase().includes(debouncedQuery.toLowerCase()),
+		);
+
+	const otherApps = apps
+		.filter((app) => !hibernationList.includes(app.packageName))
+		.filter((app) => (showSystemApps ? true : !app.isSystemApp))
+		.filter((app) => app.isStopped)
+		.filter(
+			(app) =>
+				app.appName.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+				app.packageName.toLowerCase().includes(debouncedQuery.toLowerCase()),
+		);
+
+	const selectedCount = apps.filter((a) => a.isSelected).length;
+
+	const sections = [
+		{
+			title: `Berjalan di Latar Belakang (${runningApps.length})`,
+			data: runningApps,
+			emptyText: "Tidak ada aplikasi pihak ketiga yang aktif berjalan.",
+		},
+		{
+			title: `Aplikasi Lainnya (${otherApps.length})`,
+			data: otherApps,
+			emptyText: null,
+		},
+	];
 
 	return (
-		<View className="flex-1 bg-slate-950">
-			<View className="flex-row items-center justify-between px-6 py-4 border-b border-slate-900 bg-slate-950">
+		<View className={`flex-1 ${colors.bgClass}`}>
+			<View
+				className={`flex-row items-center justify-between px-6 py-4 border-b ${colors.borderClass} ${colors.bgClass}`}
+			>
 				<View className="flex-row items-center gap-4">
 					<Pressable
 						onPress={() => setCurrentScreen("home")}
-						className="w-10 h-10 items-center justify-center rounded-full active:bg-slate-900"
+						className={`w-10 h-10 items-center justify-center rounded-full ${colors.secondaryBtnClass}`}
 					>
-						<Text className="text-white font-bold text-lg">←</Text>
+						<ArrowLeft size={24} color={colors.iconColor} />
 					</Pressable>
 					<View>
-						<Text className="text-white font-bold text-lg">
+						<Text className={`${colors.textClass} font-bold text-lg`}>
 							Penganalisis Aplikasi
 						</Text>
-						<Text className="text-slate-400 text-xs">
-							Pilih aplikasi untuk dihibernasi
+						<Text className={`${colors.subTextClass} text-xs`}>
+							Pilih aplikasi untuk ditambahkan ke KillApps
 						</Text>
 					</View>
 				</View>
@@ -76,56 +130,84 @@ export const AddAppsScreen: React.FC = () => {
 				/>
 			</View>
 
-			{isLoading ? (
+			<View className="px-4 pt-3 pb-1">
+				<View
+					className={`flex-row items-center ${colors.inputBgClass} border ${colors.borderClass} rounded-xl px-3.5 py-2.5`}
+				>
+					<Search size={18} color={colors.subIconColor} />
+					<TextInput
+						placeholder="Cari aplikasi untuk ditambahkan..."
+						placeholderTextColor={isDark ? "#71717a" : "#a1a1aa"}
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						className={`flex-1 ${colors.textClass} text-sm ml-2.5 p-0 font-medium`}
+					/>
+					{searchQuery.length > 0 && (
+						<Pressable onPress={() => setSearchQuery("")} className="p-1">
+							<X size={16} color={colors.subIconColor} />
+						</Pressable>
+					)}
+				</View>
+			</View>
+
+			{isLoading || isSearching ? (
 				<View className="flex-1 items-center justify-center">
-					<ActivityIndicator size="large" color="#f43f5e" />
-					<Text className="text-slate-400 mt-3 text-sm">
-						Memindai aplikasi di latar belakang...
+					<ActivityIndicator size="large" color={colors.iconColor} />
+					<Text className={`${colors.subTextClass} mt-3 text-sm`}>
+						{isLoading
+							? "Memindai aplikasi di latar belakang..."
+							: "Mencari aplikasi..."}
 					</Text>
 				</View>
 			) : (
-				<ScrollView className="flex-1 px-4 pt-4">
-					<View className="mb-6">
-						<View className="flex-row items-center justify-between mb-3 px-1">
-							<Text className="text-emerald-400 font-bold text-xs tracking-wider uppercase">
-								Berjalan di Latar Belakang ({runningApps.length})
+				<SectionList
+					sections={sections}
+					keyExtractor={(item) => item.packageName}
+					renderItem={({ item }) => <AppListItem app={item} />}
+					renderSectionHeader={({ section }) => (
+						<View
+							className={`flex-row items-center justify-between mb-3 mt-4 px-1 ${colors.bgClass}`}
+						>
+							<Text
+								className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
+							>
+								{section.title}
 							</Text>
 						</View>
-						{runningApps.length === 0 ? (
-							<View className="p-4 bg-slate-900/40 rounded-xl border border-slate-900 items-center">
-								<Text className="text-slate-500 text-xs">
-									Tidak ada aplikasi pihak ketiga yang aktif berjalan.
+					)}
+					renderSectionFooter={({ section }) =>
+						section.data.length === 0 && section.emptyText ? (
+							<View
+								className={`p-4 ${colors.cardClass} rounded-xl border ${colors.cardBorderClass} items-center mb-6`}
+							>
+								<Text className={`${colors.captionClass} text-xs`}>
+									{section.emptyText}
 								</Text>
 							</View>
 						) : (
-							runningApps.map((app) => (
-								<AppListItem key={app.packageName} app={app} />
-							))
-						)}
-					</View>
-
-					<View className="mb-24">
-						<View className="flex-row items-center justify-between mb-3 px-1">
-							<Text className="text-slate-400 font-bold text-xs tracking-wider uppercase">
-								Aplikasi Lainnya ({otherApps.length})
-							</Text>
-						</View>
-						{otherApps.map((app) => (
-							<AppListItem key={app.packageName} app={app} />
-						))}
-					</View>
-				</ScrollView>
+							<View className="mb-6" />
+						)
+					}
+					initialNumToRender={15}
+					maxToRenderPerBatch={15}
+					windowSize={5}
+					contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+					stickySectionHeadersEnabled={false}
+				/>
 			)}
 
 			{selectedCount > 0 && (
-				<View className="absolute bottom-6 right-6">
-					<Pressable
-						onPress={addSelectedToHibernation}
-						className="w-16 h-16 bg-emerald-600 rounded-full items-center justify-center shadow-2xl active:bg-emerald-500 border border-emerald-400/30"
-					>
-						<Text className="text-white font-black text-2xl">✓</Text>
-					</Pressable>
-				</View>
+				<Pressable
+					onPress={addSelectedToHibernation}
+					style={{ elevation: 10 }}
+					className={`absolute bottom-6 right-6 z-50 w-16 h-16 rounded-full items-center justify-center active:opacity-80 border ${
+						isDark
+							? "bg-zinc-800 border-zinc-600"
+							: "bg-zinc-900 border-zinc-700"
+					}`}
+				>
+					<Check size={30} color="#ffffff" strokeWidth={3} />
+				</Pressable>
 			)}
 		</View>
 	);

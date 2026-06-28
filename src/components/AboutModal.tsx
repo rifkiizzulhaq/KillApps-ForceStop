@@ -1,10 +1,13 @@
+import { Zap } from "lucide-react-native";
 import type React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 import { useAppStore } from "../stores/useAppStore";
 
 export const AboutModal: React.FC = () => {
 	const currentScreen = useAppStore((state) => state.currentScreen);
 	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
+	const { colors } = useTheme();
 
 	return (
 		<Modal
@@ -14,26 +17,38 @@ export const AboutModal: React.FC = () => {
 			onRequestClose={() => setCurrentScreen("home")}
 		>
 			<View className="flex-1 bg-black/80 justify-center items-center p-6">
-				<View className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm items-center shadow-2xl">
-					<View className="w-16 h-16 rounded-2xl bg-rose-600/20 border border-rose-500/30 items-center justify-center mb-4">
-						<Text className="text-rose-500 font-black text-2xl">⚡</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-3xl p-6 w-full max-w-sm items-center`}
+				>
+					<View
+						className={`w-16 h-16 rounded-2xl ${colors.secondaryBtnClass} border ${colors.borderClass} items-center justify-center mb-4`}
+					>
+						<Zap size={32} color={colors.iconColor} fill={colors.iconColor} />
 					</View>
 
-					<Text className="text-white font-bold text-xl mb-1">KillApp</Text>
-					<Text className="text-slate-400 text-xs font-semibold mb-4">
+					<Text className={`${colors.textClass} font-bold text-xl mb-1`}>
+						KillApps
+					</Text>
+					<Text className={`${colors.subTextClass} text-xs font-semibold mb-4`}>
 						Versi 1.0 (Shizuku Edition)
 					</Text>
 
-					<Text className="text-slate-300 text-center text-sm leading-6 mb-6">
+					<Text
+						className={`${colors.textClass} text-center text-sm leading-6 mb-6`}
+					>
 						Aplikasi pembunuh proses latar belakang massal 1-Klik alternatif
-						Greenify tanpa hak akses Root menggunakan teknologi Shizuku API.
+						tanpa hak akses Root menggunakan teknologi Shizuku API.
 					</Text>
 
 					<Pressable
 						onPress={() => setCurrentScreen("home")}
-						className="bg-slate-800 w-full py-3 rounded-xl items-center active:bg-slate-700"
+						className={`${colors.primaryBtnClass} w-full py-3 rounded-xl items-center active:opacity-80`}
 					>
-						<Text className="text-white font-bold text-sm">Tutup</Text>
+						<Text
+							className={`${colors.primaryBtnTextClass} font-black text-sm`}
+						>
+							Tutup
+						</Text>
 					</Pressable>
 				</View>
 			</View>

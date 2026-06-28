@@ -10,6 +10,7 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 import { useAppStore } from "../stores/useAppStore";
 import type { AppInfo } from "../types/app";
 
@@ -23,10 +24,12 @@ export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
 	onClose,
 }) => {
 	const apps = useAppStore((state) => state.apps);
+	const settings = useAppStore((state) => state.settings);
 	const hibernationList = useAppStore((state) => state.hibernationList);
 	const killSingleApp = useAppStore((state) => state.killSingleApp);
 	const killHibernationApps = useAppStore((state) => state.killHibernationApps);
 	const isKilling = useAppStore((state) => state.isKilling);
+	const { colors, isDark } = useTheme();
 
 	const [selectedApp, setSelectedApp] = useState<AppInfo | null>(null);
 
@@ -47,44 +50,62 @@ export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
 			onRequestClose={handleClose}
 		>
 			<View className="flex-1 bg-black/80 justify-center px-5">
-				<View className="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl max-h-[85%]">
-					<View className="flex-row items-center justify-between pb-4 border-b border-slate-900 mb-4">
+				<View
+					className={`${colors.modalBgClass} border ${colors.borderClass} rounded-3xl p-6 max-h-[85%]`}
+				>
+					<View
+						className={`flex-row items-center justify-between pb-4 border-b ${colors.borderClass} mb-4`}
+					>
 						<View className="flex-row items-center gap-2.5">
-							<View className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/30 items-center justify-center">
-								<Snowflake color="#f43f5e" size={22} />
+							<View
+								className={`w-10 h-10 rounded-xl ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center`}
+							>
+								<Snowflake color={colors.iconColor} size={22} />
 							</View>
 							<View>
-								<Text className="text-white font-black text-lg tracking-wider">
+								<Text
+									className={`${colors.textClass} font-black text-lg tracking-wider`}
+								>
 									Pilih Spesifik
 								</Text>
-								<Text className="text-slate-400 text-xs font-semibold">
-									Klik aplikasi untuk memunculkan tombol freeze
+								<Text
+									className={`${colors.subTextClass} text-xs font-semibold`}
+								>
+									Klik aplikasi untuk memunculkan tombol penghentian
 								</Text>
 							</View>
 						</View>
 						<Pressable
 							onPress={handleClose}
-							className="w-10 h-10 rounded-full bg-slate-900 items-center justify-center active:bg-slate-800 border border-slate-800"
+							className={`w-10 h-10 rounded-full ${colors.cardClass} items-center justify-center active:opacity-70 border ${colors.cardBorderClass}`}
 						>
-							<X color="#94a3b8" size={20} />
+							<X color={colors.iconColor} size={20} />
 						</Pressable>
 					</View>
 
 					{activeTargets.length === 0 ? (
 						<View className="py-12 items-center justify-center">
-							<Text className="text-slate-400 font-bold text-center text-sm mb-1">
-								Semua aplikasi target sudah tidur pulas.
+							<Text
+								className={`${colors.subTextClass} font-bold text-center text-sm mb-1`}
+							>
+								Semua aplikasi target sudah dihentikan prosesnya.
 							</Text>
-							<Text className="text-slate-500 text-center text-xs">
-								Tidak ada aplikasi aktif yang perlu dibekukan saat ini.
+							<Text className={`${colors.captionClass} text-center text-xs`}>
+								Tidak ada aplikasi aktif yang perlu dihentikan saat ini.
 							</Text>
 						</View>
 					) : (
 						<>
-							<Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+							<Text
+								className={`${colors.captionClass} text-xs font-bold uppercase tracking-wider mb-3`}
+							>
 								Jajaran Aplikasi Aktif ({activeTargets.length})
 							</Text>
-							<ScrollView className="mb-4 max-h-60">
+							<ScrollView
+								className="mb-4 max-h-60"
+								decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
+								overScrollMode="never"
+							>
 								<View className="flex-row flex-wrap justify-between">
 									{activeTargets.map((app) => {
 										const isSelected =
@@ -93,71 +114,74 @@ export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
 											<Pressable
 												key={app.packageName}
 												onPress={() => setSelectedApp(app)}
-												className={`w-[48%] p-3 rounded-2xl mb-2.5 border flex-row items-center ${
+												className={`w-[48%] mb-2.5 p-3 rounded-2xl border flex-row items-center gap-2.5 active:opacity-70 ${
 													isSelected
-														? "bg-rose-500/20 border-rose-500"
-														: "bg-slate-900 border-slate-800"
+														? `${colors.primaryBtnClass} ${isDark ? "border-white" : "border-black"}`
+														: `${colors.cardClass} ${colors.cardBorderClass}`
 												}`}
 											>
 												{app.icon ? (
 													<Image
 														source={{ uri: app.icon }}
-														className="w-9 h-9 rounded-xl mr-2.5 bg-slate-800"
+														className={`w-9 h-9 rounded-xl ${colors.secondaryBtnClass}`}
 													/>
 												) : (
-													<View className="w-9 h-9 rounded-xl mr-2.5 bg-slate-800 items-center justify-center">
-														<Text className="text-white font-bold text-sm">
+													<View
+														className={`w-9 h-9 rounded-xl ${colors.secondaryBtnClass} items-center justify-center`}
+													>
+														<Text
+															className={`${isSelected ? colors.primaryBtnTextClass : colors.textClass} font-bold`}
+														>
 															{app.appName.charAt(0).toUpperCase()}
 														</Text>
 													</View>
 												)}
-												<View className="flex-1">
-													<Text
-														numberOfLines={1}
-														className={`font-bold text-xs ${
-															isSelected ? "text-rose-300" : "text-white"
-														}`}
-													>
-														{app.appName}
-													</Text>
-													<Text
-														numberOfLines={1}
-														className="text-slate-400 text-[10px] mt-0.5"
-													>
-														{isSelected ? "Dipilih" : "Aktif"}
-													</Text>
-												</View>
+												<Text
+													numberOfLines={1}
+													className={`font-bold text-xs flex-1 ${
+														isSelected
+															? colors.primaryBtnTextClass
+															: colors.textClass
+													}`}
+												>
+													{app.appName}
+												</Text>
 											</Pressable>
 										);
 									})}
 								</View>
 							</ScrollView>
-
 							{selectedApp && (
-								<View className="p-4 bg-slate-900 border border-rose-500/50 rounded-2xl mb-4 shadow-lg">
+								<View
+									className={`p-4 rounded-2xl ${colors.cardClass} border ${colors.cardBorderClass} mb-4`}
+								>
 									<View className="flex-row items-center justify-between mb-3">
-										<View className="flex-row items-center flex-1 pr-2">
+										<View className="flex-row items-center gap-2.5 flex-1 pr-2">
 											{selectedApp.icon ? (
 												<Image
 													source={{ uri: selectedApp.icon }}
-													className="w-10 h-10 rounded-xl mr-3 bg-slate-800"
+													className={`w-10 h-10 rounded-xl ${colors.secondaryBtnClass}`}
 												/>
 											) : (
-												<View className="w-10 h-10 rounded-xl mr-3 bg-slate-800 items-center justify-center">
-													<Text className="text-white font-bold text-sm">
-														{selectedApp.appName.charAt(0).toUpperCase()}
+												<View
+													className={`w-10 h-10 rounded-xl ${colors.secondaryBtnClass} items-center justify-center`}
+												>
+													<Text className={`${colors.textClass} font-black`}>
+														{selectedApp.appName.substring(0, 2).toUpperCase()}
 													</Text>
 												</View>
 											)}
 											<View className="flex-1">
 												<Text
 													numberOfLines={1}
-													className="text-white font-bold text-sm"
+													className={`${colors.textClass} font-bold text-sm`}
 												>
 													{selectedApp.appName}
 												</Text>
-												<Text className="text-rose-400 text-xs font-semibold mt-0.5">
-													Siap dibekukan spesifik
+												<Text
+													className={`${colors.subTextClass} text-xs font-semibold mt-0.5`}
+												>
+													Siap dihentikan spesifik
 												</Text>
 											</View>
 										</View>
@@ -169,15 +193,31 @@ export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
 											await killSingleApp(selectedApp.packageName);
 											setSelectedApp(null);
 										}}
-										className="w-full py-3.5 bg-rose-600 rounded-xl items-center justify-center flex-row gap-2 active:bg-rose-500 shadow-md border border-rose-400/30"
+										className={`w-full py-3.5 ${colors.primaryBtnClass} rounded-xl items-center justify-center flex-row gap-2 active:opacity-80 border ${isDark ? "border-white" : "border-black"}`}
 									>
 										{isKilling ? (
-											<ActivityIndicator color="#ffffff" size="small" />
+											<ActivityIndicator
+												color={
+													colors.primaryBtnTextClass === "text-black"
+														? "#000000"
+														: "#ffffff"
+												}
+												size="small"
+											/>
 										) : (
 											<>
-												<PauseCircle color="#ffffff" size={18} />
-												<Text className="text-white font-black text-xs tracking-wider">
-													FREEZE {selectedApp.appName.toUpperCase()}
+												<PauseCircle
+													color={
+														colors.primaryBtnTextClass === "text-black"
+															? "#000000"
+															: "#ffffff"
+													}
+													size={18}
+												/>
+												<Text
+													className={`${colors.primaryBtnTextClass} font-black text-xs tracking-wider`}
+												>
+													KILL {selectedApp.appName.toUpperCase()}
 												</Text>
 											</>
 										)}
@@ -197,15 +237,17 @@ export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
 									handleClose();
 								}
 							}}
-							className="w-full py-3.5 bg-slate-900 border border-slate-800 rounded-2xl items-center justify-center flex-row gap-2 active:bg-slate-800"
+							className={`w-full py-3.5 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl items-center justify-center flex-row gap-2 active:opacity-80`}
 						>
 							{isKilling ? (
-								<ActivityIndicator color="#ffffff" size="small" />
+								<ActivityIndicator color={colors.iconColor} size="small" />
 							) : (
 								<>
-									<Snowflake color="#f43f5e" size={16} />
-									<Text className="text-rose-400 font-bold text-xs tracking-wider">
-										FREEZE SEMUA ({activeTargets.length})
+									<Snowflake color={colors.iconColor} size={16} />
+									<Text
+										className={`${colors.textClass} font-bold text-xs tracking-wider`}
+									>
+										KILL SEMUA ({activeTargets.length})
 									</Text>
 								</>
 							)}

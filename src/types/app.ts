@@ -27,4 +27,6 @@ export interface AppSettings {
 	longPressNavBar: boolean;
 	dontRemoveNotif: boolean;
 	hibernateSystemApps: boolean;
+	themeMode?: "system" | "light" | "dark";
+	smoothScroll?: boolean;
 }

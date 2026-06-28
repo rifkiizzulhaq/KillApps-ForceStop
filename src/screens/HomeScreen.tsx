@@ -1,3 +1,4 @@
+import { Brain, Plus, Search, Snowflake, X } from "lucide-react-native";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -8,71 +9,92 @@ import {
 	Pressable,
 	ScrollView,
 	Text,
+	TextInput,
 	View,
 } from "react-native";
 import { AboutModal } from "../components/AboutModal";
 import { HeaderMenu } from "../components/HeaderMenu";
 import { QuickFreezeModal } from "../components/QuickFreezeModal";
 import { SettingsModal } from "../components/SettingsModal";
+import { useTheme } from "../hooks/useTheme";
 import { killerService } from "../services/killerService";
 import { useAppStore } from "../stores/useAppStore";
-import { AddAppsScreen } from "./AddAppsScreen";
 
 export const HomeScreen: React.FC = () => {
-	const currentScreen = useAppStore((state) => state.currentScreen);
-	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
 	const apps = useAppStore((state) => state.apps);
 	const hibernationList = useAppStore((state) => state.hibernationList);
-	const settings = useAppStore((state) => state.settings);
+	const isLoading = useAppStore((state) => state.isLoading);
+	const isKilling = useAppStore((state) => state.isKilling);
+	const killMessage = useAppStore((state) => state.killMessage);
 	const removeFromHibernation = useAppStore(
 		(state) => state.removeFromHibernation,
 	);
 	const killHibernationApps = useAppStore((state) => state.killHibernationApps);
-	const isKilling = useAppStore((state) => state.isKilling);
-	const killMessage = useAppStore((state) => state.killMessage);
-	const clearKillMessage = useAppStore((state) => state.clearKillMessage);
+	const killSingleApp = useAppStore((state) => state.killSingleApp);
 	const checkShizukuStatus = useAppStore((state) => state.checkShizukuStatus);
 	const fetchApps = useAppStore((state) => state.fetchApps);
+	const clearKillMessage = useAppStore((state) => state.clearKillMessage);
+	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
+	const settings = useAppStore((state) => state.settings);
+	const { colors, isDark } = useTheme();
+
+	const [searchQuery, setSearchQuery] = useState("");
 	const [showQuickFreezeModal, setShowQuickFreezeModal] = useState(false);
 
 	useEffect(() => {
 		checkShizukuStatus();
-		if (currentScreen === "home") {
-			fetchApps();
-		}
-	}, [checkShizukuStatus, currentScreen, fetchApps]);
 
-	useEffect(() => {
-		killerService.checkInitialQuickFreeze().then((res) => {
-			if (res) {
-				setShowQuickFreezeModal(true);
-			}
-		});
-
-		const frozenSub = DeviceEventEmitter.addListener("onAppsFrozen", () => {
-			fetchApps();
-		});
-
-		const quickFreezeSub = DeviceEventEmitter.addListener(
-			"onOpenQuickFreeze",
-			() => {
-				setShowQuickFreezeModal(true);
-				fetchApps();
+		const subscription = DeviceEventEmitter.addListener(
+			"ON_APP_KILLED_NOTIF",
+			async () => {
+				await killHibernationApps();
 			},
 		);
 
-		const appStateSub = AppState.addEventListener("change", (nextState) => {
-			if (nextState === "active") {
-				fetchApps();
+		const notifSub = DeviceEventEmitter.addListener(
+			"ON_NOTIF_ACTION_CLICKED",
+			async () => {
+				await killHibernationApps();
+			},
+		);
+
+		const singleSub = DeviceEventEmitter.addListener(
+			"ON_SINGLE_KILL_CLICKED",
+			async (event: { packageName?: string }) => {
+				if (event?.packageName) {
+					await killSingleApp(event.packageName);
+				}
+			},
+		);
+
+		const freezeAllSub = DeviceEventEmitter.addListener(
+			"ON_FREEZE_ALL_CLICKED",
+			() => {
+				setShowQuickFreezeModal(true);
+			},
+		);
+
+		const frozenSub = DeviceEventEmitter.addListener("onAppsFrozen", () => {
+			setTimeout(() => {
+				fetchApps(true);
+			}, 200);
+		});
+
+		const appStateSub = AppState.addEventListener("change", (nextAppState) => {
+			if (nextAppState === "active") {
+				fetchApps(true);
 			}
 		});
 
 		return () => {
+			subscription.remove();
+			notifSub.remove();
+			singleSub.remove();
+			freezeAllSub.remove();
 			frozenSub.remove();
-			quickFreezeSub.remove();
 			appStateSub.remove();
 		};
-	}, [fetchApps]);
+	}, [checkShizukuStatus, killHibernationApps, killSingleApp, fetchApps]);
 
 	useEffect(() => {
 		killerService.setAutoHibernationConfig(
@@ -87,17 +109,18 @@ export const HomeScreen: React.FC = () => {
 		);
 	}, [settings?.quickActionNotif]);
 
-	if (currentScreen === "add_apps") {
-		return <AddAppsScreen />;
-	}
+	const targetApps = apps
+		.filter((app) => hibernationList.includes(app.packageName))
+		.filter(
+			(app) =>
+				app.appName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				app.packageName.toLowerCase().includes(searchQuery.toLowerCase()),
+		);
 
-	const targetApps = apps.filter((app) =>
-		hibernationList.includes(app.packageName),
-	);
-	const activeTargetsCount = targetApps.filter((app) => !app.isStopped).length;
+	const activeTargetsCount = targetApps.filter((a) => !a.isStopped).length;
 
 	return (
-		<View className="flex-1 bg-slate-950">
+		<View className={`flex-1 ${colors.bgClass}`}>
 			<SettingsModal />
 			<AboutModal />
 			<QuickFreezeModal
@@ -105,13 +128,17 @@ export const HomeScreen: React.FC = () => {
 				onClose={() => setShowQuickFreezeModal(false)}
 			/>
 
-			<View className="flex-row items-center justify-between px-6 py-4 border-b border-slate-900 bg-slate-950">
+			<View
+				className={`flex-row items-center justify-between px-6 py-4 border-b ${colors.borderClass} ${colors.bgClass}`}
+			>
 				<View>
-					<Text className="text-2xl font-black text-white tracking-wider">
-						KILL<Text className="text-rose-500">APP</Text>
+					<Text
+						className={`text-2xl font-black ${colors.textClass} tracking-wider`}
+					>
+						KILL<Text className={colors.subTextClass}>APPS</Text>
 					</Text>
-					<Text className="text-slate-400 text-xs font-semibold">
-						Penganalisis & Hibernasi 1-Klik
+					<Text className={`${colors.subTextClass} text-xs font-semibold`}>
+						Penganalisis & KillApps 1-Klik
 					</Text>
 				</View>
 
@@ -132,141 +159,252 @@ export const HomeScreen: React.FC = () => {
 			{killMessage && (
 				<Pressable
 					onPress={clearKillMessage}
-					className="mx-6 mt-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl flex-row justify-between items-center shadow-lg"
+					className={`mx-6 mt-4 ${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row justify-between items-center`}
 				>
-					<Text className="text-slate-200 text-xs font-semibold flex-1">
-						{killMessage}
-					</Text>
-					<Text className="text-rose-400 font-bold ml-3">✕</Text>
+					<View className="flex-1 mr-2">
+						<Text
+							className={`${colors.textClass} text-xs font-semibold leading-5`}
+						>
+							{killMessage}
+						</Text>
+						{(settings?.smartHibernation || settings?.shallowHibernation) && (
+							<View className="flex-row flex-wrap items-center gap-2 mt-2">
+								{settings?.smartHibernation && (
+									<View className="flex-row items-center bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+										<Brain size={13} color="#3b82f6" />
+										<Text className="text-[11px] text-blue-500 font-bold ml-1.5">
+											Smart KillApps aktif
+										</Text>
+									</View>
+								)}
+								{settings?.shallowHibernation && (
+									<View className="flex-row items-center bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
+										<Snowflake size={13} color="#06b6d4" />
+										<Text className="text-[11px] text-cyan-500 font-bold ml-1.5">
+											KillApps dangkal diterapkan
+										</Text>
+									</View>
+								)}
+							</View>
+						)}
+					</View>
+					<View className="ml-2">
+						<X size={16} color={colors.iconColor} />
+					</View>
 				</Pressable>
 			)}
 
-			{hibernationList.length === 0 ? (
+			{hibernationList.length > 0 && (isLoading || apps.length === 0) ? (
 				<View className="flex-1 items-center justify-center px-8">
-					<View className="w-24 h-24 rounded-full bg-slate-900 border border-slate-800 items-center justify-center mb-6 shadow-inner">
-						<Text className="text-4xl">🍃</Text>
-					</View>
-					<Text className="text-white font-bold text-xl mb-2 text-center">
-						Selamat Datang di KillApp
+					<ActivityIndicator size="large" color={colors.iconColor} />
+					<Text
+						className={`${colors.textClass} font-bold text-base mt-4 mb-1 text-center`}
+					>
+						Memuat Daftar KillApps...
 					</Text>
-					<Text className="text-slate-400 text-center text-sm leading-6 mb-8">
-						Belum ada aplikasi yang ditambahkan ke daftar hibernasi. Tekan
-						tombol + di bawah untuk memilih aplikasi latar belakang yang ingin
+					<Text className={`${colors.subTextClass} text-center text-xs`}>
+						Memeriksa aplikasi yang sudah dilist
+					</Text>
+				</View>
+			) : targetApps.length === 0 && searchQuery === "" ? (
+				<View className="flex-1 items-center justify-center px-8">
+					<View
+						className={`w-24 h-24 rounded-full ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-6`}
+					>
+						<Snowflake size={40} color={colors.iconColor} />
+					</View>
+					<Text
+						className={`${colors.textClass} font-bold text-xl mb-2 text-center`}
+					>
+						Selamat Datang di KillApps
+					</Text>
+					<Text
+						className={`${colors.subTextClass} text-center text-sm leading-6 mb-8`}
+					>
+						Belum ada aplikasi yang ditambahkan ke daftar KillApps. Tekan tombol
+						+ di bawah untuk memilih aplikasi latar belakang yang ingin
 						dimatikan otomatis.
 					</Text>
 				</View>
 			) : (
-				<ScrollView className="flex-1 px-4 pt-4 mb-24">
-					<View className="flex-row items-center justify-between mb-3 px-2">
-						<Text className="text-slate-400 font-bold text-xs tracking-wider uppercase">
-							Daftar Hibernasi ({hibernationList.length})
-						</Text>
-						{activeTargetsCount > 0 && (
-							<Text className="text-emerald-400 font-semibold text-xs">
-								{activeTargetsCount} Aktif Berjalan
-							</Text>
-						)}
+				<>
+					<View className="px-4 pt-3 pb-1">
+						<View
+							className={`flex-row items-center ${colors.inputBgClass} border ${colors.borderClass} rounded-xl px-3.5 py-2.5`}
+						>
+							<Search size={18} color={colors.subIconColor} />
+							<TextInput
+								placeholder="Cari di daftar KillApps..."
+								placeholderTextColor={isDark ? "#71717a" : "#a1a1aa"}
+								value={searchQuery}
+								onChangeText={setSearchQuery}
+								className={`flex-1 ${colors.textClass} text-sm ml-2.5 p-0 font-medium`}
+							/>
+							{searchQuery.length > 0 && (
+								<Pressable onPress={() => setSearchQuery("")} className="p-1">
+									<X size={16} color={colors.subIconColor} />
+								</Pressable>
+							)}
+						</View>
 					</View>
 
-					{targetApps.map((app) => (
-						<View
-							key={app.packageName}
-							className="flex-row items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-2xl mb-2.5 shadow-md"
-						>
-							<View className="flex-row items-center flex-1 pr-3">
-								{app.icon ? (
-									<Image
-										source={{ uri: app.icon }}
-										className="w-11 h-11 rounded-xl mr-3 bg-slate-800/80"
-									/>
-								) : (
-									<View className="w-11 h-11 rounded-xl mr-3 bg-slate-800 items-center justify-center">
-										<Text className="text-white font-bold text-base">
-											{app.appName.charAt(0).toUpperCase()}
-										</Text>
-									</View>
-								)}
+					<ScrollView
+						className="flex-1 px-4 pt-3 mb-24"
+						showsVerticalScrollIndicator={false}
+						decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
+						overScrollMode="never"
+					>
+						<View className="flex-row items-center justify-between mb-3 px-2">
+							<Text
+								className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
+							>
+								Daftar KillApps ({targetApps.length})
+							</Text>
+							{activeTargetsCount > 0 && (
+								<Text className={`${colors.textClass} font-bold text-xs`}>
+									{activeTargetsCount} Aktif Berjalan
+								</Text>
+							)}
+						</View>
 
-								<View className="flex-1">
-									<View className="flex-row items-center gap-2">
-										<Text
-											numberOfLines={1}
-											className="text-white font-bold text-base flex-1"
-										>
-											{app.appName}
-										</Text>
-										{app.isGcm && (
-											<View className="bg-sky-500/20 border border-sky-500/30 px-2 py-0.5 rounded">
-												<Text className="text-[10px] font-bold text-sky-400">
-													GCM
+						{targetApps.length === 0 ? (
+							<View className="items-center justify-center pt-16 px-6">
+								<Search size={36} color={colors.subIconColor} opacity={0.5} />
+								<Text
+									className={`${colors.textClass} font-bold text-base mt-4 mb-1 text-center`}
+								>
+									Aplikasi Tidak Ditemukan
+								</Text>
+								<Text
+									className={`${colors.subTextClass} text-center text-xs leading-5`}
+								>
+									Tidak ada aplikasi yang cocok dengan kata kunci "{searchQuery}
+									".
+								</Text>
+							</View>
+						) : (
+							targetApps.map((app) => (
+								<View
+									key={app.packageName}
+									className={`flex-row items-center justify-between p-4 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-2.5`}
+								>
+									<View className="flex-row items-center flex-1 pr-3">
+										{app.icon ? (
+											<Image
+												source={{ uri: app.icon }}
+												className={`w-11 h-11 rounded-xl mr-3 ${colors.secondaryBtnClass}`}
+											/>
+										) : (
+											<View
+												className={`w-11 h-11 rounded-xl mr-3 ${colors.secondaryBtnClass} items-center justify-center`}
+											>
+												<Text
+													className={`${colors.textClass} font-bold text-base`}
+												>
+													{app.appName.charAt(0).toUpperCase()}
 												</Text>
 											</View>
 										)}
-										<View
-											className={`px-2 py-0.5 rounded border ${
-												app.isStopped
-													? "bg-slate-800 border-slate-700"
-													: "bg-emerald-500/20 border-emerald-500/30"
-											}`}
-										>
+
+										<View className="flex-1">
+											<View className="flex-row items-center gap-2">
+												<Text
+													numberOfLines={1}
+													className={`${colors.textClass} font-bold text-base flex-1`}
+												>
+													{app.appName}
+												</Text>
+												{app.isGcm && (
+													<View
+														className={`${colors.secondaryBtnClass} border ${colors.borderClass} px-2 py-0.5 rounded`}
+													>
+														<Text
+															className={`text-[10px] font-bold ${colors.subTextClass}`}
+														>
+															GCM
+														</Text>
+													</View>
+												)}
+												<View
+													className={`px-2 py-0.5 rounded border ${
+														app.isStopped
+															? `${colors.secondaryBtnClass} ${colors.borderClass}`
+															: `${colors.primaryBtnClass} ${isDark ? "border-white" : "border-black"}`
+													}`}
+												>
+													<Text
+														className={`text-[10px] font-black ${
+															app.isStopped
+																? colors.subTextClass
+																: colors.primaryBtnTextClass
+														}`}
+													>
+														{app.isStopped ? "Zzz" : "Aktif"}
+													</Text>
+												</View>
+											</View>
 											<Text
-												className={`text-[10px] font-bold ${
-													app.isStopped ? "text-slate-400" : "text-emerald-400"
-												}`}
+												numberOfLines={1}
+												className={`${colors.subTextClass} text-xs mt-1`}
 											>
-												{app.isStopped ? "Zzz" : "Aktif"}
+												{app.packageName}
 											</Text>
 										</View>
 									</View>
-									<Text
-										numberOfLines={1}
-										className="text-slate-400 text-xs mt-1"
-									>
-										{app.packageName}
-									</Text>
-								</View>
-							</View>
 
-							<Pressable
-								onPress={() => removeFromHibernation(app.packageName)}
-								className="w-8 h-8 rounded-full bg-slate-800 items-center justify-center active:bg-slate-700"
-							>
-								<Text className="text-rose-400 font-bold text-sm">✕</Text>
-							</Pressable>
-						</View>
-					))}
-				</ScrollView>
+									<Pressable
+										onPress={() => removeFromHibernation(app.packageName)}
+										className={`w-8 h-8 rounded-full ${colors.secondaryBtnClass} items-center justify-center active:opacity-70`}
+									>
+										<X size={16} color={colors.iconColor} />
+									</Pressable>
+								</View>
+							))
+						)}
+					</ScrollView>
+				</>
 			)}
 
-			{hibernationList.length > 0 && (
-				<View className="absolute bottom-6 left-6 right-28">
+			{targetApps.length > 0 && (
+				<View
+					style={{ elevation: 10 }}
+					className="absolute bottom-6 left-6 right-24 z-50"
+				>
 					<Pressable
 						onPress={killHibernationApps}
 						disabled={isKilling || activeTargetsCount === 0}
-						className={`py-4 px-6 rounded-2xl items-center justify-center shadow-2xl flex-row gap-3 ${
+						className={`w-full h-14 px-4 rounded-2xl items-center justify-center flex-row gap-3 border ${
 							activeTargetsCount > 0
-								? "bg-rose-600 active:bg-rose-500 border border-rose-400/30"
-								: "bg-slate-900 border border-slate-800 opacity-80"
+								? isDark
+									? "bg-zinc-800 border-zinc-600 active:opacity-80"
+									: "bg-zinc-900 border-zinc-700 active:opacity-80"
+								: `${colors.cardClass} ${colors.cardBorderClass} opacity-80`
 						}`}
 					>
 						{isKilling && <ActivityIndicator color="#ffffff" size="small" />}
-						<Text className="text-white font-black text-sm tracking-wider">
+						<Text
+							numberOfLines={1}
+							className={`font-black text-xs sm:text-sm tracking-wider ${
+								activeTargetsCount > 0 ? "text-white" : colors.subTextClass
+							}`}
+						>
 							{isKilling
 								? "MEMATIKAN..."
-								: `HIBERNASI SEKARANG (${activeTargetsCount})`}
+								: `KILLAPPS SEKARANG (${activeTargetsCount})`}
 						</Text>
 					</Pressable>
 				</View>
 			)}
 
-			<View className="absolute bottom-6 right-6">
-				<Pressable
-					onPress={() => setCurrentScreen("add_apps")}
-					className="w-16 h-16 bg-sky-600 rounded-full items-center justify-center shadow-2xl active:bg-sky-500 border border-sky-400/30"
-				>
-					<Text className="text-white font-black text-3xl">+</Text>
-				</Pressable>
-			</View>
+			<Pressable
+				onPress={() => setCurrentScreen("add_apps")}
+				style={{ elevation: 10 }}
+				className={`absolute bottom-6 right-6 z-50 w-14 h-14 rounded-full items-center justify-center active:opacity-80 border ${
+					isDark ? "bg-zinc-800 border-zinc-600" : "bg-zinc-900 border-zinc-700"
+				}`}
+			>
+				<Plus size={28} color="#ffffff" strokeWidth={3} />
+			</Pressable>
 		</View>
 	);
 };
