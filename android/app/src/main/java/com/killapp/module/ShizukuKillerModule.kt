@@ -1,4 +1,7 @@
-package com.killapp
+package com.killapp.module
+
+import com.killapp.service.KillerForegroundService
+import com.killapp.service.KillerNotificationHelper
 
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -14,8 +17,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Toast
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -115,58 +121,166 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     @ReactMethod
-    fun getInstalledApps(promise: Promise) {
+    fun checkRootAccess(promise: Promise) {
+        Thread {
+            try {
+                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+                val exitCode = process.waitFor()
+                if (exitCode == 0) {
+                    promise.resolve(true)
+                } else {
+                    promise.resolve(false)
+                }
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
+        }.start()
+    }
+
+    @ReactMethod
+    fun isIgnoringBatteryOptimizations(promise: Promise) {
         try {
-            val packageManager = reactApplicationContext.packageManager
-            val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-            val result = Arguments.createArray()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val pm = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                val isIgnored = pm.isIgnoringBatteryOptimizations(reactApplicationContext.packageName)
+                promise.resolve(isIgnored)
+            } else {
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
 
-            for (app in apps) {
-                val packageName = app.packageName
-                if (packageName == reactApplicationContext.packageName) continue
-                val appName = packageManager.getApplicationLabel(app).toString()
-                val isSystemApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val isGcm = packageManager.checkPermission("com.google.android.c2dm.permission.RECEIVE", packageName) == PackageManager.PERMISSION_GRANTED
-                val isStopped = (app.flags and ApplicationInfo.FLAG_STOPPED) != 0
+    @ReactMethod
+    fun requestIgnoreBatteryOptimizations(promise: Promise) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                intent.data = Uri.parse("package:" + reactApplicationContext.packageName)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                reactApplicationContext.startActivity(intent)
+                promise.resolve(true)
+            } else {
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                reactApplicationContext.startActivity(intent)
+                promise.resolve(true)
+            } catch (ex: Exception) {
+                promise.reject("ERROR", ex.message)
+            }
+        }
+    }
 
-                var iconBase64 = iconCache[packageName] ?: ""
-                if (iconBase64.isEmpty()) {
-                    try {
-                        val drawable = packageManager.getApplicationIcon(app)
-                        val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
-                            drawable.bitmap
-                        } else {
-                            val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                            val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                            val canvas = Canvas(bmp)
-                            drawable.setBounds(0, 0, canvas.width, canvas.height)
-                            drawable.draw(canvas)
-                            bmp
+    @ReactMethod
+    fun killAppsViaRoot(packageNames: ReadableArray, promise: Promise) {
+        Thread {
+            val successList = mutableListOf<String>()
+            val failedList = mutableListOf<String>()
+            try {
+                val suProcess = Runtime.getRuntime().exec("su")
+                val os = java.io.DataOutputStream(suProcess.outputStream)
+                for (i in 0 until packageNames.size()) {
+                    val pkg = packageNames.getString(i)
+                    if (!pkg.isNullOrEmpty()) {
+                        os.writeBytes("am force-stop $pkg\n")
+                        os.flush()
+                        successList.add(pkg)
+                    }
+                }
+                os.writeBytes("exit\n")
+                os.flush()
+                suProcess.waitFor()
+            } catch (e: Exception) {
+                for (i in 0 until packageNames.size()) {
+                    val pkg = packageNames.getString(i)
+                    if (!pkg.isNullOrEmpty() && !successList.contains(pkg)) {
+                        failedList.add(pkg)
+                    }
+                }
+            }
+            val result = Arguments.createMap()
+            val successArray = Arguments.createArray()
+            val failedArray = Arguments.createArray()
+            successList.forEach { successArray.pushString(it) }
+            failedList.forEach { failedArray.pushString(it) }
+            result.putArray("success", successArray)
+            result.putArray("failed", failedArray)
+            promise.resolve(result)
+        }.start()
+    }
+
+    @ReactMethod
+    fun getInstalledApps(promise: Promise) {
+        Thread {
+            try {
+                val packageManager = reactApplicationContext.packageManager
+                val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+                val targetApps = apps.filter { it.packageName != reactApplicationContext.packageName }
+
+                val executor = java.util.concurrent.Executors.newFixedThreadPool(4)
+                val futures = targetApps.map { app ->
+                    executor.submit(java.util.concurrent.Callable {
+                        val packageName = app.packageName
+                        val appName = packageManager.getApplicationLabel(app).toString()
+                        val isSystemApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                        val isGcm = packageManager.checkPermission("com.google.android.c2dm.permission.RECEIVE", packageName) == PackageManager.PERMISSION_GRANTED
+                        val isStopped = (app.flags and ApplicationInfo.FLAG_STOPPED) != 0
+
+                        var iconBase64 = iconCache[packageName] ?: ""
+                        if (iconBase64.isEmpty()) {
+                            try {
+                                val drawable = packageManager.getApplicationIcon(app)
+                                val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                                    drawable.bitmap
+                                } else {
+                                    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 72
+                                    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 72
+                                    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                    val canvas = Canvas(bmp)
+                                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                                    drawable.draw(canvas)
+                                    bmp
+                                }
+                                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 72, 72, true)
+                                val stream = ByteArrayOutputStream()
+                                scaledBitmap.compress(Bitmap.CompressFormat.PNG, 80, stream)
+                                iconBase64 = "data:image/png;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                                iconCache[packageName] = iconBase64
+                            } catch (e: Exception) {
+                            }
                         }
-                        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 96, 96, true)
-                        val stream = ByteArrayOutputStream()
-                        scaledBitmap.compress(Bitmap.CompressFormat.PNG, 80, stream)
-                        iconBase64 = "data:image/png;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-                        iconCache[packageName] = iconBase64
+
+                        val appMap = Arguments.createMap()
+                        appMap.putString("packageName", packageName)
+                        appMap.putString("appName", appName)
+                        appMap.putString("icon", iconBase64)
+                        appMap.putBoolean("isSystemApp", isSystemApp)
+                        appMap.putBoolean("isGcm", isGcm)
+                        appMap.putBoolean("isStopped", isStopped)
+                        appMap
+                    })
+                }
+
+                val result = Arguments.createArray()
+                for (future in futures) {
+                    try {
+                        result.pushMap(future.get())
                     } catch (e: Exception) {
                     }
                 }
+                executor.shutdown()
 
-                val appMap = Arguments.createMap()
-                appMap.putString("packageName", packageName)
-                appMap.putString("appName", appName)
-                appMap.putString("icon", iconBase64)
-                appMap.putBoolean("isSystemApp", isSystemApp)
-                appMap.putBoolean("isGcm", isGcm)
-                appMap.putBoolean("isStopped", isStopped)
-                result.pushMap(appMap)
+                updateNotificationDisplay(true)
+                promise.resolve(result)
+            } catch (e: Exception) {
+                promise.reject("GET_APPS_ERROR", e.message)
             }
-            updateNotificationDisplay(true)
-            promise.resolve(result)
-        } catch (e: Exception) {
-            promise.reject("GET_APPS_ERROR", e.message)
-        }
+        }.start()
     }
 
     @ReactMethod
@@ -362,14 +476,14 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             } else {
                 reactApplicationContext.startService(serviceIntent)
             }
-            pollingHandler?.post(object : Runnable {
-                override fun run() {
-                    if (quickActionNotifEnabled) {
-                        updateNotificationDisplay(false)
-                        pollingHandler?.postDelayed(this, 200)
-                    }
-                }
-            })
+			pollingHandler?.post(object : Runnable {
+				override fun run() {
+					if (quickActionNotifEnabled) {
+						updateNotificationDisplay(false)
+						pollingHandler?.postDelayed(this, 2000)
+					}
+				}
+			})
         } else {
             reactApplicationContext.stopService(serviceIntent)
         }

@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react-native";
+import { ArrowRight, RotateCcw } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -8,16 +8,25 @@ import {
 	Text,
 	View,
 } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { useAppStore } from "../stores/useAppStore";
-import { InfoModal } from "./InfoModal";
-import { ModernToggle } from "./ModernToggle";
-import { SelectionModal } from "./SelectionModal";
+import { useTheme } from "../../hooks/useTheme";
+import { useAppStore } from "../../stores/useAppStore";
+import { InfoModal } from "../modals/InfoModal";
+import { SelectionModal } from "../modals/SelectionModal";
+import { SettingToggleRow } from "./SettingToggleRow";
 
 export const SettingsMainTab: React.FC = () => {
 	const settings = useAppStore((state) => state.settings);
 	const updateSetting = useAppStore((state) => state.updateSetting);
+	const resetOnboarding = useAppStore((state) => state.resetOnboarding);
+	const isRootActive = useAppStore((state) => state.isRootActive);
+	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
+	const isPermissionGranted = useAppStore((state) => state.isPermissionGranted);
 	const { colors, isDark } = useTheme();
+
+	const isModeVerified =
+		settings.workingMode === "root"
+			? isRootActive
+			: isShizukuActive && isPermissionGranted;
 
 	const [workingModeModal, setWorkingModeModal] = useState(false);
 	const [navBarModal, setNavBarModal] = useState(false);
@@ -102,18 +111,11 @@ export const SettingsMainTab: React.FC = () => {
 			</View>
 
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-5 px-4 py-3 flex-row items-center justify-between`}
+				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-5 px-4`}
 			>
-				<View className="flex-1 pr-4">
-					<Text className={`${colors.textClass} font-bold text-sm`}>
-						Gulir Mulus (Smooth Scroll)
-					</Text>
-					<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-						Animasi gulir daftar aplikasi yang lebih halus dan responsif saat
-						di-scroll.
-					</Text>
-				</View>
-				<ModernToggle
+				<SettingToggleRow
+					title="Gulir Mulus (Smooth Scroll)"
+					subtitle="Animasi gulir daftar aplikasi yang lebih halus dan responsif saat di-scroll."
 					value={settings?.smoothScroll ?? true}
 					onValueChange={(v) => updateSetting("smoothScroll", v)}
 				/>
@@ -149,205 +151,150 @@ export const SettingsMainTab: React.FC = () => {
 				</View>
 			</Pressable>
 
-			<Text
-				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
-			>
-				3. Cerdas & Deteksi Lanjutan
-			</Text>
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
+				pointerEvents={isModeVerified ? "auto" : "none"}
+				style={{ opacity: isModeVerified ? 1 : 0.4 }}
 			>
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Smart KillApps
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Analisis pintar untuk menunda eksekusi saat aplikasi sedang
-							melakukan tugas penting.
-						</Text>
-					</View>
-					<ModernToggle
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					3. Cerdas & Deteksi Lanjutan
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
+				>
+					<SettingToggleRow
+						title="Smart KillApps"
+						subtitle="Analisis pintar untuk menunda eksekusi saat aplikasi sedang melakukan tugas penting."
 						value={settings?.smartHibernation ?? true}
 						onValueChange={(v) => updateSetting("smartHibernation", v)}
 					/>
-				</View>
-
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Finer Detection (Media Playback)
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Mencegah pemotongan pemutaran musik atau video yang berjalan di
-							latar belakang.
-						</Text>
-					</View>
-					<ModernToggle
+					<SettingToggleRow
+						title="Finer Detection (Media Playback)"
+						subtitle="Mencegah pemotongan pemutaran musik atau video yang berjalan di latar belakang."
 						value={settings?.finerMediaDetection ?? false}
 						onValueChange={(v) => updateSetting("finerMediaDetection", v)}
 					/>
 				</View>
-			</View>
 
-			<Text
-				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
-			>
-				4. Intensitas & Kebangkitan
-			</Text>
-			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
-			>
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							KillApps Dangkal (Shallow)
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Membekukan aktivitas sementara tanpa mematikan total proses
-							aplikasi (Android 9+).
-						</Text>
-					</View>
-					<ModernToggle
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					4. Intensitas & Kebangkitan
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
+				>
+					<SettingToggleRow
+						title="KillApps Dangkal (Shallow)"
+						subtitle="Membekukan aktivitas sementara tanpa mematikan total proses aplikasi (Android 9+)."
 						value={settings?.shallowHibernation ?? false}
 						onValueChange={(v) => updateSetting("shallowHibernation", v)}
 					/>
-				</View>
-
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Wake-up Tracking and Cut-off
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Lacak aplikasi yang sering terbangun sendiri dan potong rantai
-							pemicunya.
-						</Text>
-					</View>
-					<ModernToggle
+					<SettingToggleRow
+						title="Wake-up Tracking and Cut-off"
+						subtitle="Lacak aplikasi yang sering terbangun sendiri dan potong rantai pemicunya."
 						value={settings?.wakeUpTracking ?? true}
 						onValueChange={(v) => updateSetting("wakeUpTracking", v)}
 					/>
 				</View>
-			</View>
 
-			<Text
-				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
-			>
-				5. Otomatisasi & Pengecualian
-			</Text>
-			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
-			>
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Otomatis KillApps
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Eksekusi penghentian aplikasi latar belakang otomatis setelah
-							layar ponsel dimatikan.
-						</Text>
-					</View>
-					<ModernToggle
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					5. Otomatisasi & Pengecualian
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-3 px-4 py-1 divide-y ${colors.dividerClass}`}
+				>
+					<SettingToggleRow
+						title="Otomatis KillApps"
+						subtitle="Eksekusi penghentian aplikasi latar belakang otomatis setelah layar ponsel dimatikan."
 						value={settings?.autoHibernation ?? false}
 						onValueChange={(v) => updateSetting("autoHibernation", v)}
 					/>
-				</View>
-
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Always Ignore Background-free
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Lewati aplikasi yang sudah bersih dan tidak memiliki layanan latar
-							belakang aktif.
-						</Text>
-					</View>
-					<ModernToggle
+					<SettingToggleRow
+						title="Always Ignore Background-free"
+						subtitle="Lewati aplikasi yang sudah bersih dan tidak memiliki layanan latar belakang aktif."
 						value={settings?.ignoreBackgroundFree ?? false}
 						onValueChange={(v) => updateSetting("ignoreBackgroundFree", v)}
 					/>
-				</View>
-
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Sertakan Aplikasi Sistem
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Tampilkan dan izinkan penambahan aplikasi sistem inti ke dalam
-							daftar KillApps.
-						</Text>
-					</View>
-					<ModernToggle
+					<SettingToggleRow
+						title="Sertakan Aplikasi Sistem"
+						subtitle="Tampilkan dan izinkan penambahan aplikasi sistem inti ke dalam daftar KillApps."
 						value={settings?.hibernateSystemApps ?? false}
 						onValueChange={(v) => updateSetting("hibernateSystemApps", v)}
 					/>
 				</View>
+
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					6. Pintasan & Notifikasi
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 px-4 py-1 divide-y ${colors.dividerClass}`}
+				>
+					<SettingToggleRow
+						title="Quick Action Notification"
+						subtitle="Tampilkan pintasan eksekusi cepat 1-ketuk pada panel notifikasi atas."
+						value={settings?.quickActionNotif ?? false}
+						onValueChange={handleQuickNotifChange}
+					/>
+
+					<Pressable
+						onPress={handleLongPressNavBar}
+						className="py-3 flex-row items-center justify-between active:opacity-70"
+					>
+						<View className="flex-1 pr-4">
+							<Text className={`${colors.textClass} font-bold text-sm`}>
+								Long-press Action on Nav-bar
+							</Text>
+							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+								Aksi cepat saat menekan lama tombol Home atau bilah navigasi
+								bawah.
+							</Text>
+						</View>
+						<View className="flex-row items-center gap-1">
+							<Text className={`${colors.textClass} font-bold text-xs`}>
+								Atur
+							</Text>
+							<ArrowRight size={14} color={colors.iconColor} />
+						</View>
+					</Pressable>
+
+					<SettingToggleRow
+						title="Don&apos;t Remove Notification"
+						subtitle="Jaga agar kartu notifikasi penting tidak ikut terhapus saat mematikan aplikasi."
+						value={settings?.dontRemoveNotif ?? false}
+						onValueChange={(v) => updateSetting("dontRemoveNotif", v)}
+					/>
+				</View>
 			</View>
 
 			<Text
 				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
 			>
-				6. Pintasan & Notifikasi
+				10. SISTEM / RESET
 			</Text>
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 px-4 py-1 divide-y ${colors.dividerClass}`}
+				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2`}
 			>
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Quick Action Notification
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Tampilkan pintasan eksekusi cepat 1-ketuk pada panel notifikasi
-							atas.
-						</Text>
-					</View>
-					<ModernToggle
-						value={settings?.quickActionNotif ?? false}
-						onValueChange={handleQuickNotifChange}
-					/>
-				</View>
-
 				<Pressable
-					onPress={handleLongPressNavBar}
-					className="py-3 flex-row items-center justify-between active:opacity-70"
+					onPress={resetOnboarding}
+					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Long-press Action on Nav-bar
+					<View className="flex-1 pr-3">
+						<Text className="text-rose-500 font-bold text-sm">
+							Reset Sambutan & Awal Aplikasi
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Aksi cepat saat menekan lama tombol Home atau bilah navigasi
-							bawah.
+							Membuka kembali layar panduan awal, verifikasi perizinan, dan
+							pemilihan mode kerja.
 						</Text>
 					</View>
-					<View className="flex-row items-center gap-1">
-						<Text className={`${colors.textClass} font-bold text-xs`}>
-							Atur
-						</Text>
-						<ArrowRight size={14} color={colors.iconColor} />
-					</View>
+					<RotateCcw size={20} color="#f43f5e" />
 				</Pressable>
-
-				<View className="py-3 flex-row items-center justify-between">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Don&apos;t Remove Notification
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Jaga agar kartu notifikasi penting tidak ikut terhapus saat
-							mematikan aplikasi.
-						</Text>
-					</View>
-					<ModernToggle
-						value={settings?.dontRemoveNotif ?? false}
-						onValueChange={(v) => updateSetting("dontRemoveNotif", v)}
-					/>
-				</View>
 			</View>
 
 			<SelectionModal

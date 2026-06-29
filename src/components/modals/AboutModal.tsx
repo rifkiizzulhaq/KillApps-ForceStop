@@ -1,8 +1,8 @@
 import { Zap } from "lucide-react-native";
 import type React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { useAppStore } from "../stores/useAppStore";
+import { useTheme } from "../../hooks/useTheme";
+import { useAppStore } from "../../stores/useAppStore";
 
 export const AboutModal: React.FC = () => {
 	const currentScreen = useAppStore((state) => state.currentScreen);

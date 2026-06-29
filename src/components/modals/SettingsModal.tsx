@@ -2,11 +2,11 @@ import { X } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { useAppStore } from "../stores/useAppStore";
-import { SettingsMainTab } from "./SettingsMainTab";
-import { SettingsTroubleshootTab } from "./SettingsTroubleshootTab";
-import { ShizukuStatusCard } from "./ShizukuStatusCard";
+import { useTheme } from "../../hooks/useTheme";
+import { useAppStore } from "../../stores/useAppStore";
+import { ShizukuStatusCard } from "../common/ShizukuStatusCard";
+import { SettingsMainTab } from "../settings/SettingsMainTab";
+import { SettingsTroubleshootTab } from "../settings/SettingsTroubleshootTab";
 
 export const SettingsModal: React.FC = () => {
 	const currentScreen = useAppStore((state) => state.currentScreen);

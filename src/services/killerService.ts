@@ -12,6 +12,7 @@ interface IKillerService {
 	setAutoHibernationConfig(enabled: boolean, packageNames: string[]): void;
 	setQuickActionNotification(enabled: boolean): void;
 	checkInitialQuickFreeze(): Promise<boolean>;
+	checkRootAccess(): Promise<boolean>;
 }
 
 class ShizukuKillerServiceImpl implements IKillerService {
@@ -81,41 +82,68 @@ class ShizukuKillerServiceImpl implements IKillerService {
 		}
 		return false;
 	}
+
+	async checkRootAccess(): Promise<boolean> {
+		if (Platform.OS !== "android" || !ShizukuKillerModule) {
+			return false;
+		}
+		return await ShizukuKillerModule.checkRootAccess();
+	}
 }
 
 class RootKillerServiceImpl implements IKillerService {
 	async checkBinder(): Promise<boolean> {
-		return false;
+		return await this.checkRootAccess();
 	}
 
 	async checkPermission(): Promise<boolean> {
-		return false;
+		return await this.checkRootAccess();
 	}
 
 	async requestPermission(): Promise<boolean> {
-		return false;
+		return await this.checkRootAccess();
 	}
 
 	async getInstalledApps(): Promise<AppInfo[]> {
-		return [];
+		return await shizukuInstance.getInstalledApps();
 	}
 
 	async killApps(packageNames: string[]): Promise<KillResult> {
-		return { success: [], failed: packageNames };
+		if (Platform.OS !== "android" || !ShizukuKillerModule) {
+			return { success: [], failed: packageNames };
+		}
+		return await ShizukuKillerModule.killAppsViaRoot(packageNames);
 	}
 
-	setAutoHibernationConfig(): void {}
-	setQuickActionNotification(): void {}
+	setAutoHibernationConfig(enabled: boolean, packageNames: string[]): void {
+		shizukuInstance.setAutoHibernationConfig(enabled, packageNames);
+	}
+	setQuickActionNotification(enabled: boolean): void {
+		shizukuInstance.setQuickActionNotification(enabled);
+	}
 	async checkInitialQuickFreeze(): Promise<boolean> {
-		return false;
+		return await shizukuInstance.checkInitialQuickFreeze();
+	}
+
+	async checkRootAccess(): Promise<boolean> {
+		if (Platform.OS !== "android" || !ShizukuKillerModule) {
+			return false;
+		}
+		return await ShizukuKillerModule.checkRootAccess();
 	}
 }
 
 const shizukuInstance = new ShizukuKillerServiceImpl();
 const rootInstance = new RootKillerServiceImpl();
 
+let currentMode: KillerMode = "shizuku";
+
+export const setKillerMode = (mode: KillerMode): void => {
+	currentMode = mode;
+};
+
 export const getKillerService = (
-	mode: KillerMode = "shizuku",
+	mode: KillerMode = currentMode,
 ): IKillerService => {
 	if (mode === "root") {
 		return rootInstance;
@@ -123,4 +151,27 @@ export const getKillerService = (
 	return shizukuInstance;
 };
 
-export const killerService = getKillerService("shizuku");
+export const killerService: IKillerService = {
+	checkBinder: () => getKillerService(currentMode).checkBinder(),
+	checkPermission: () => getKillerService(currentMode).checkPermission(),
+	requestPermission: () => getKillerService(currentMode).requestPermission(),
+	getInstalledApps: () => getKillerService(currentMode).getInstalledApps(),
+	killApps: (pkgs) => getKillerService(currentMode).killApps(pkgs),
+	setAutoHibernationConfig: (e, p) =>
+		getKillerService(currentMode).setAutoHibernationConfig(e, p),
+	setQuickActionNotification: (e) =>
+		getKillerService(currentMode).setQuickActionNotification(e),
+	checkInitialQuickFreeze: () =>
+		getKillerService(currentMode).checkInitialQuickFreeze(),
+	checkRootAccess: () => getKillerService(currentMode).checkRootAccess(),
+};
+
+export const checkBatteryOptimization = async (): Promise<boolean> => {
+	if (Platform.OS !== "android" || !ShizukuKillerModule) return true;
+	return await ShizukuKillerModule.isIgnoringBatteryOptimizations();
+};
+
+export const requestBatteryOptimization = async (): Promise<boolean> => {
+	if (Platform.OS !== "android" || !ShizukuKillerModule) return true;
+	return await ShizukuKillerModule.requestIgnoreBatteryOptimizations();
+};

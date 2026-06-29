@@ -1,4 +1,4 @@
-package com.killapp
+package com.killapp.service
 
 import android.app.Service
 import android.content.Context
@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import com.killapp.module.ShizukuKillerModule
 
 class KillerForegroundService : Service() {
     private var handler: Handler? = null
@@ -40,7 +41,7 @@ class KillerForegroundService : Service() {
                         postponed,
                         false
                     )
-                    handler?.postDelayed(this, 200)
+                    handler?.postDelayed(this, 2000)
                 } else {
                     stopSelf()
                 }

@@ -5,17 +5,18 @@ import {
 	ActivityIndicator,
 	AppState,
 	DeviceEventEmitter,
-	Image,
 	Pressable,
 	ScrollView,
 	Text,
 	TextInput,
 	View,
 } from "react-native";
-import { AboutModal } from "../components/AboutModal";
-import { HeaderMenu } from "../components/HeaderMenu";
-import { QuickFreezeModal } from "../components/QuickFreezeModal";
-import { SettingsModal } from "../components/SettingsModal";
+import { HeaderMenu } from "../components/common/HeaderMenu";
+import { ShizukuStatusCard } from "../components/common/ShizukuStatusCard";
+import { HibernationListItem } from "../components/lists/HibernationListItem";
+import { AboutModal } from "../components/modals/AboutModal";
+import { QuickKillModal } from "../components/modals/QuickKillModal";
+import { SettingsModal } from "../components/modals/SettingsModal";
 import { useTheme } from "../hooks/useTheme";
 import { killerService } from "../services/killerService";
 import { useAppStore } from "../stores/useAppStore";
@@ -23,6 +24,9 @@ import { useAppStore } from "../stores/useAppStore";
 export const HomeScreen: React.FC = () => {
 	const apps = useAppStore((state) => state.apps);
 	const hibernationList = useAppStore((state) => state.hibernationList);
+	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
+	const isPermissionGranted = useAppStore((state) => state.isPermissionGranted);
+	const isRootActive = useAppStore((state) => state.isRootActive);
 	const isLoading = useAppStore((state) => state.isLoading);
 	const isKilling = useAppStore((state) => state.isKilling);
 	const killMessage = useAppStore((state) => state.killMessage);
@@ -38,11 +42,19 @@ export const HomeScreen: React.FC = () => {
 	const settings = useAppStore((state) => state.settings);
 	const { colors, isDark } = useTheme();
 
+	const isModeVerified =
+		settings.workingMode === "root"
+			? isRootActive
+			: isShizukuActive && isPermissionGranted;
+
 	const [searchQuery, setSearchQuery] = useState("");
-	const [showQuickFreezeModal, setShowQuickFreezeModal] = useState(false);
+	const [showQuickKillModal, setShowQuickKillModal] = useState(false);
 
 	useEffect(() => {
 		checkShizukuStatus();
+		if (apps.length === 0) {
+			fetchApps();
+		}
 
 		const subscription = DeviceEventEmitter.addListener(
 			"ON_APP_KILLED_NOTIF",
@@ -70,7 +82,7 @@ export const HomeScreen: React.FC = () => {
 		const freezeAllSub = DeviceEventEmitter.addListener(
 			"ON_FREEZE_ALL_CLICKED",
 			() => {
-				setShowQuickFreezeModal(true);
+				setShowQuickKillModal(true);
 			},
 		);
 
@@ -94,7 +106,13 @@ export const HomeScreen: React.FC = () => {
 			frozenSub.remove();
 			appStateSub.remove();
 		};
-	}, [checkShizukuStatus, killHibernationApps, killSingleApp, fetchApps]);
+	}, [
+		checkShizukuStatus,
+		killHibernationApps,
+		killSingleApp,
+		fetchApps,
+		apps.length,
+	]);
 
 	useEffect(() => {
 		killerService.setAutoHibernationConfig(
@@ -123,9 +141,9 @@ export const HomeScreen: React.FC = () => {
 		<View className={`flex-1 ${colors.bgClass}`}>
 			<SettingsModal />
 			<AboutModal />
-			<QuickFreezeModal
-				visible={showQuickFreezeModal}
-				onClose={() => setShowQuickFreezeModal(false)}
+			<QuickKillModal
+				visible={showQuickKillModal}
+				onClose={() => setShowQuickKillModal(false)}
 			/>
 
 			<View
@@ -155,6 +173,12 @@ export const HomeScreen: React.FC = () => {
 					]}
 				/>
 			</View>
+
+			{!isModeVerified && (
+				<View className="px-6 pt-4">
+					<ShizukuStatusCard />
+				</View>
+			)}
 
 			{killMessage && (
 				<Pressable
@@ -284,81 +308,12 @@ export const HomeScreen: React.FC = () => {
 							</View>
 						) : (
 							targetApps.map((app) => (
-								<View
+								<HibernationListItem
 									key={app.packageName}
-									className={`flex-row items-center justify-between p-4 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-2.5`}
-								>
-									<View className="flex-row items-center flex-1 pr-3">
-										{app.icon ? (
-											<Image
-												source={{ uri: app.icon }}
-												className={`w-11 h-11 rounded-xl mr-3 ${colors.secondaryBtnClass}`}
-											/>
-										) : (
-											<View
-												className={`w-11 h-11 rounded-xl mr-3 ${colors.secondaryBtnClass} items-center justify-center`}
-											>
-												<Text
-													className={`${colors.textClass} font-bold text-base`}
-												>
-													{app.appName.charAt(0).toUpperCase()}
-												</Text>
-											</View>
-										)}
-
-										<View className="flex-1">
-											<View className="flex-row items-center gap-2">
-												<Text
-													numberOfLines={1}
-													className={`${colors.textClass} font-bold text-base flex-1`}
-												>
-													{app.appName}
-												</Text>
-												{app.isGcm && (
-													<View
-														className={`${colors.secondaryBtnClass} border ${colors.borderClass} px-2 py-0.5 rounded`}
-													>
-														<Text
-															className={`text-[10px] font-bold ${colors.subTextClass}`}
-														>
-															GCM
-														</Text>
-													</View>
-												)}
-												<View
-													className={`px-2 py-0.5 rounded border ${
-														app.isStopped
-															? `${colors.secondaryBtnClass} ${colors.borderClass}`
-															: `${colors.primaryBtnClass} ${isDark ? "border-white" : "border-black"}`
-													}`}
-												>
-													<Text
-														className={`text-[10px] font-black ${
-															app.isStopped
-																? colors.subTextClass
-																: colors.primaryBtnTextClass
-														}`}
-													>
-														{app.isStopped ? "Zzz" : "Aktif"}
-													</Text>
-												</View>
-											</View>
-											<Text
-												numberOfLines={1}
-												className={`${colors.subTextClass} text-xs mt-1`}
-											>
-												{app.packageName}
-											</Text>
-										</View>
-									</View>
-
-									<Pressable
-										onPress={() => removeFromHibernation(app.packageName)}
-										className={`w-8 h-8 rounded-full ${colors.secondaryBtnClass} items-center justify-center active:opacity-70`}
-									>
-										<X size={16} color={colors.iconColor} />
-									</Pressable>
-								</View>
+									app={app}
+									onRemove={removeFromHibernation}
+									disabled={!isModeVerified}
+								/>
 							))
 						)}
 					</ScrollView>
@@ -372,20 +327,22 @@ export const HomeScreen: React.FC = () => {
 				>
 					<Pressable
 						onPress={killHibernationApps}
-						disabled={isKilling || activeTargetsCount === 0}
-						className={`w-full h-14 px-4 rounded-2xl items-center justify-center flex-row gap-3 border ${
-							activeTargetsCount > 0
+						disabled={!isModeVerified || isKilling || activeTargetsCount === 0}
+						className={`w-full h-14 px-4 rounded-2xl items-center justify-center flex-row gap-3 border transition-all ${
+							isModeVerified && activeTargetsCount > 0
 								? isDark
 									? "bg-zinc-800 border-zinc-600 active:opacity-80"
 									: "bg-zinc-900 border-zinc-700 active:opacity-80"
-								: `${colors.cardClass} ${colors.cardBorderClass} opacity-80`
+								: `${colors.cardClass} ${colors.cardBorderClass} opacity-40`
 						}`}
 					>
 						{isKilling && <ActivityIndicator color="#ffffff" size="small" />}
 						<Text
 							numberOfLines={1}
 							className={`font-black text-xs sm:text-sm tracking-wider ${
-								activeTargetsCount > 0 ? "text-white" : colors.subTextClass
+								isModeVerified && activeTargetsCount > 0
+									? "text-white"
+									: colors.subTextClass
 							}`}
 						>
 							{isKilling
@@ -397,10 +354,18 @@ export const HomeScreen: React.FC = () => {
 			)}
 
 			<Pressable
-				onPress={() => setCurrentScreen("add_apps")}
+				onPress={() => {
+					if (!isModeVerified) return;
+					setCurrentScreen("add_apps");
+				}}
+				disabled={!isModeVerified}
 				style={{ elevation: 10 }}
-				className={`absolute bottom-6 right-6 z-50 w-14 h-14 rounded-full items-center justify-center active:opacity-80 border ${
-					isDark ? "bg-zinc-800 border-zinc-600" : "bg-zinc-900 border-zinc-700"
+				className={`absolute bottom-6 right-6 z-50 w-14 h-14 rounded-full items-center justify-center transition-all border ${
+					!isModeVerified
+						? `${colors.cardClass} ${colors.cardBorderClass} opacity-40`
+						: isDark
+							? "bg-zinc-800 border-zinc-600 active:opacity-80"
+							: "bg-zinc-900 border-zinc-700 active:opacity-80"
 				}`}
 			>
 				<Plus size={28} color="#ffffff" strokeWidth={3} />

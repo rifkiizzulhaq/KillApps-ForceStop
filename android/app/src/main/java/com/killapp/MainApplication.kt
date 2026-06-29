@@ -1,6 +1,7 @@
 package com.killapp
 
 import android.app.Application
+import com.killapp.module.ShizukuKillerPackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost

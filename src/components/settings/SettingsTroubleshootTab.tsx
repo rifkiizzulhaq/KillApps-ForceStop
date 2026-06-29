@@ -2,8 +2,8 @@ import { Info, Rocket, Settings, Wrench, Zap } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { InfoModal } from "./InfoModal";
+import { useTheme } from "../../hooks/useTheme";
+import { InfoModal } from "../modals/InfoModal";
 
 export const SettingsTroubleshootTab: React.FC = () => {
 	const { colors } = useTheme();

@@ -10,16 +10,16 @@ import {
 	Text,
 	View,
 } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { useAppStore } from "../stores/useAppStore";
-import type { AppInfo } from "../types/app";
+import { useTheme } from "../../hooks/useTheme";
+import { useAppStore } from "../../stores/useAppStore";
+import type { AppInfo } from "../../types/app";
 
-interface QuickFreezeModalProps {
+interface QuickKillModalProps {
 	visible: boolean;
 	onClose: () => void;
 }
 
-export const QuickFreezeModal: React.FC<QuickFreezeModalProps> = ({
+export const QuickKillModal: React.FC<QuickKillModalProps> = ({
 	visible,
 	onClose,
 }) => {

@@ -1,4 +1,4 @@
-package com.killapp
+package com.killapp.module
 
 import android.view.View
 import com.facebook.react.ReactPackage

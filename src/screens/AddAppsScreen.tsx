@@ -10,8 +10,8 @@ import {
 	TextInput,
 	View,
 } from "react-native";
-import { AppListItem } from "../components/AppListItem";
-import { HeaderMenu } from "../components/HeaderMenu";
+import { HeaderMenu } from "../components/common/HeaderMenu";
+import { AppListItem } from "../components/lists/AppListItem";
 import { useTheme } from "../hooks/useTheme";
 import { useAppStore } from "../stores/useAppStore";
 
@@ -29,7 +29,16 @@ export const AddAppsScreen: React.FC = () => {
 		(state) => state.toggleShowSystemApps,
 	);
 	const hibernationList = useAppStore((state) => state.hibernationList);
+	const isRootActive = useAppStore((state) => state.isRootActive);
+	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
+	const isPermissionGranted = useAppStore((state) => state.isPermissionGranted);
+	const settings = useAppStore((state) => state.settings);
 	const { colors, isDark } = useTheme();
+
+	const isModeVerified =
+		settings.workingMode === "root"
+			? isRootActive
+			: isShizukuActive && isPermissionGranted;
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -160,50 +169,62 @@ export const AddAppsScreen: React.FC = () => {
 					</Text>
 				</View>
 			) : (
-				<SectionList
-					sections={sections}
-					keyExtractor={(item) => item.packageName}
-					renderItem={({ item }) => <AppListItem app={item} />}
-					renderSectionHeader={({ section }) => (
-						<View
-							className={`flex-row items-center justify-between mb-3 mt-4 px-1 ${colors.bgClass}`}
-						>
-							<Text
-								className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
-							>
-								{section.title}
-							</Text>
-						</View>
-					)}
-					renderSectionFooter={({ section }) =>
-						section.data.length === 0 && section.emptyText ? (
+				<View
+					className="flex-1"
+					pointerEvents={isModeVerified ? "auto" : "none"}
+					style={{ opacity: isModeVerified ? 1 : 0.4 }}
+				>
+					<SectionList
+						sections={sections}
+						keyExtractor={(item) => item.packageName}
+						renderItem={({ item }) => <AppListItem app={item} />}
+						renderSectionHeader={({ section }) => (
 							<View
-								className={`p-4 ${colors.cardClass} rounded-xl border ${colors.cardBorderClass} items-center mb-6`}
+								className={`flex-row items-center justify-between mb-3 mt-4 px-1 ${colors.bgClass}`}
 							>
-								<Text className={`${colors.captionClass} text-xs`}>
-									{section.emptyText}
+								<Text
+									className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
+								>
+									{section.title}
 								</Text>
 							</View>
-						) : (
-							<View className="mb-6" />
-						)
-					}
-					initialNumToRender={15}
-					maxToRenderPerBatch={15}
-					windowSize={5}
-					contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-					stickySectionHeadersEnabled={false}
-				/>
+						)}
+						renderSectionFooter={({ section }) =>
+							section.data.length === 0 && section.emptyText ? (
+								<View
+									className={`p-4 ${colors.cardClass} rounded-xl border ${colors.cardBorderClass} items-center mb-6`}
+								>
+									<Text className={`${colors.captionClass} text-xs`}>
+										{section.emptyText}
+									</Text>
+								</View>
+							) : (
+								<View className="mb-6" />
+							)
+						}
+						initialNumToRender={15}
+						maxToRenderPerBatch={15}
+						windowSize={5}
+						contentContainerStyle={{
+							paddingHorizontal: 16,
+							paddingBottom: 100,
+						}}
+						stickySectionHeadersEnabled={false}
+					/>
+				</View>
 			)}
 
 			{selectedCount > 0 && (
 				<Pressable
-					onPress={addSelectedToHibernation}
+					onPress={() => isModeVerified && addSelectedToHibernation()}
+					disabled={!isModeVerified}
 					style={{ elevation: 10 }}
-					className={`absolute bottom-6 right-6 z-50 w-16 h-16 rounded-full items-center justify-center active:opacity-80 border ${
-						isDark
-							? "bg-zinc-800 border-zinc-600"
-							: "bg-zinc-900 border-zinc-700"
+					className={`absolute bottom-6 right-6 z-50 w-16 h-16 rounded-full items-center justify-center transition-all border ${
+						!isModeVerified
+							? "opacity-40 bg-zinc-700 border-zinc-600"
+							: isDark
+								? "bg-zinc-800 border-zinc-600 active:opacity-80"
+								: "bg-zinc-900 border-zinc-700 active:opacity-80"
 					}`}
 				>
 					<Check size={30} color="#ffffff" strokeWidth={3} />

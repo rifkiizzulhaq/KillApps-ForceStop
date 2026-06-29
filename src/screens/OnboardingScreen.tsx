@@ -1,0 +1,495 @@
+import {
+	Check,
+	Settings,
+	Shield,
+	ShieldAlert,
+	Terminal,
+	Zap,
+} from "lucide-react-native";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+	ActivityIndicator,
+	PermissionsAndroid,
+	Platform,
+	Pressable,
+	ScrollView,
+	Text,
+	View,
+} from "react-native";
+import { useTheme } from "../hooks/useTheme";
+import {
+	checkBatteryOptimization,
+	requestBatteryOptimization,
+} from "../services/killerService";
+import { useAppStore } from "../stores/useAppStore";
+
+export const OnboardingScreen: React.FC = () => {
+	const [step, setStep] = useState<number>(1);
+	const [isVerifying, setIsVerifying] = useState<boolean>(false);
+
+	const [notifGranted, setNotifGranted] = useState<boolean>(false);
+	const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
+
+	const settings = useAppStore((state) => state.settings);
+	const updateSetting = useAppStore((state) => state.updateSetting);
+	const completeOnboarding = useAppStore((state) => state.completeOnboarding);
+
+	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
+	const isPermissionGranted = useAppStore((state) => state.isPermissionGranted);
+	const isRootActive = useAppStore((state) => state.isRootActive);
+	const _isLoading = useAppStore((state) => state.isLoading);
+
+	const checkShizukuStatus = useAppStore((state) => state.checkShizukuStatus);
+	const requestShizukuPermission = useAppStore(
+		(state) => state.requestShizukuPermission,
+	);
+	const checkRootStatus = useAppStore((state) => state.checkRootStatus);
+
+	const { colors, isDark } = useTheme();
+	const currentMode = settings.workingMode;
+
+	const isModeVerified =
+		currentMode === "root"
+			? isRootActive
+			: isShizukuActive && isPermissionGranted;
+
+	const sdkLevel = Platform.OS === "android" ? Number(Platform.Version) : 33;
+
+	const getAndroidVersionName = (api: number) => {
+		if (api >= 34) return `Android 14+ (API ${api})`;
+		if (api === 33) return `Android 13 (API 33)`;
+		if (api === 32) return `Android 12L (API 32)`;
+		if (api === 31) return `Android 12 (API 31)`;
+		if (api === 30) return `Android 11 (API 30)`;
+		if (api === 29) return `Android 10 (API 29)`;
+		if (api === 28) return `Android 9.0 Pie (API 28)`;
+		if (api === 27 || api === 26) return `Android 8.0/8.1 Oreo (API ${api})`;
+		if (api === 25 || api === 24) return `Android 7.0/7.1 Nougat (API ${api})`;
+		if (api === 23) return `Android 6.0 Marshmallow (API 23)`;
+		if (api >= 21) return `Android 5.0/5.1 Lollipop (API ${api})`;
+		return `Android API ${api}`;
+	};
+
+	const checkSystemPermissions = useCallback(async () => {
+		if (Platform.OS === "android") {
+			if (sdkLevel >= 33) {
+				const granted = await PermissionsAndroid.check(
+					"android.permission.POST_NOTIFICATIONS",
+				);
+				setNotifGranted(granted);
+			} else {
+				setNotifGranted(true);
+			}
+			if (sdkLevel >= 23) {
+				const ignored = await checkBatteryOptimization();
+				setBatteryIgnored(ignored);
+			} else {
+				setBatteryIgnored(true);
+			}
+		} else {
+			setNotifGranted(true);
+			setBatteryIgnored(true);
+		}
+	}, [sdkLevel]);
+
+	useEffect(() => {
+		if (step === 2) {
+			checkSystemPermissions();
+		}
+	}, [step, checkSystemPermissions]);
+
+	const startVerification = useCallback(async () => {
+		setIsVerifying(true);
+		try {
+			if (currentMode === "root") {
+				await checkRootStatus();
+			} else {
+				await checkShizukuStatus();
+			}
+		} finally {
+			setIsVerifying(false);
+		}
+	}, [currentMode, checkRootStatus, checkShizukuStatus]);
+
+	useEffect(() => {
+		if (step === 3) {
+			startVerification();
+		}
+	}, [step, startVerification]);
+
+	const allPermsGranted = batteryIgnored && notifGranted;
+
+	let permCounter = 1;
+
+	return (
+		<View className={`flex-1 ${colors.bgClass}`}>
+			<View className="px-6 pt-8 pb-4 flex-row items-center justify-between border-b border-zinc-800/20">
+				<View className="flex-row items-center gap-2">
+					<Shield size={24} color={colors.iconColor} />
+					<Text
+						className={`text-xl font-black ${colors.textClass} tracking-wider`}
+					>
+						KILL<Text className={colors.subTextClass}>APPS</Text>
+					</Text>
+				</View>
+				<View className="flex-row gap-1.5 items-center">
+					{[1, 2, 3].map((s) => (
+						<View
+							key={s}
+							className={`h-2 rounded-full transition-all ${
+								s === step
+									? isDark
+										? "w-6 bg-white"
+										: "w-6 bg-black"
+									: s < step
+										? isDark
+											? "w-2 bg-zinc-400"
+											: "w-2 bg-zinc-600"
+										: isDark
+											? "w-2 bg-zinc-800"
+											: "w-2 bg-zinc-300"
+							}`}
+						/>
+					))}
+				</View>
+			</View>
+
+			<ScrollView
+				className="flex-1 px-6 pt-6"
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: 40 }}
+			>
+				{step === 1 && (
+					<View className="py-6">
+						<View
+							className={`w-20 h-20 rounded-2xl ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-6`}
+						>
+							<Zap size={36} color={colors.iconColor} />
+						</View>
+						<Text className={`${colors.textClass} text-2xl font-black mb-6`}>
+							Selamat Datang di KillApps
+						</Text>
+						<View className="w-full gap-3">
+							<View
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center gap-3`}
+							>
+								<Settings size={22} color={colors.iconColor} />
+								<Text
+									className={`${colors.textClass} font-bold text-sm flex-1`}
+								>
+									Penghentian Aplikasi Latar Belakang
+								</Text>
+							</View>
+							<View
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center gap-3`}
+							>
+								<Shield size={22} color={colors.iconColor} />
+								<Text
+									className={`${colors.textClass} font-bold text-sm flex-1`}
+								>
+									Penghematan RAM & Baterai
+								</Text>
+							</View>
+						</View>
+					</View>
+				)}
+
+				{step === 2 && (
+					<View className="py-4">
+						<Text className={`${colors.textClass} text-2xl font-black mb-1`}>
+							Perizinan Android
+						</Text>
+						<Text
+							className={`${colors.subTextClass} text-xs font-semibold mb-6`}
+						>
+							Terdeteksi: {getAndroidVersionName(sdkLevel)}
+						</Text>
+
+						<View className="gap-3">
+							{sdkLevel >= 23 && (
+								<View
+									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+								>
+									<Text
+										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
+									>
+										{permCounter++}. Abaikan Optimasi Baterai
+									</Text>
+									<Pressable
+										onPress={async () => {
+											await requestBatteryOptimization();
+											setTimeout(checkSystemPermissions, 1000);
+										}}
+										className={`px-3 py-1.5 rounded border ${batteryIgnored ? (isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300") : colors.primaryBtnClass}`}
+									>
+										<Text
+											className={`text-[10px] font-black uppercase ${batteryIgnored ? colors.textClass : colors.primaryBtnTextClass}`}
+										>
+											{batteryIgnored ? "DIZINKAN" : "MINTA IZIN"}
+										</Text>
+									</Pressable>
+								</View>
+							)}
+
+							{sdkLevel >= 30 && (
+								<View
+									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+								>
+									<Text
+										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
+									>
+										{permCounter++}. Akses Daftar Semua Aplikasi
+									</Text>
+									<View
+										className={`px-2.5 py-1 rounded border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300"}`}
+									>
+										<Text
+											className={`text-[10px] font-black uppercase ${colors.textClass}`}
+										>
+											OTOMATIS AKTIF
+										</Text>
+									</View>
+								</View>
+							)}
+
+							{sdkLevel >= 33 && (
+								<View
+									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+								>
+									<Text
+										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
+									>
+										{permCounter++}. Izin Notifikasi Sistem
+									</Text>
+									<Pressable
+										onPress={async () => {
+											if (Platform.OS === "android") {
+												await PermissionsAndroid.request(
+													"android.permission.POST_NOTIFICATIONS",
+												);
+												checkSystemPermissions();
+											}
+										}}
+										className={`px-3 py-1.5 rounded border ${notifGranted ? (isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300") : colors.primaryBtnClass}`}
+									>
+										<Text
+											className={`text-[10px] font-black uppercase ${notifGranted ? colors.textClass : colors.primaryBtnTextClass}`}
+										>
+											{notifGranted ? "DIZINKAN" : "MINTA IZIN"}
+										</Text>
+									</Pressable>
+								</View>
+							)}
+
+							{sdkLevel < 23 && (
+								<View
+									className={`${colors.cardClass} border ${colors.cardBorderClass} p-6 rounded-2xl items-center`}
+								>
+									<Check size={36} color={colors.iconColor} />
+									<Text
+										className={`${colors.textClass} font-bold text-sm mt-3 text-center`}
+									>
+										Tidak Ada Izin Aplikasi Tambahan
+									</Text>
+									<Text
+										className={`${colors.subTextClass} text-xs mt-1 text-center`}
+									>
+										Versi Android Anda siap menjalankan KillApps secara
+										langsung.
+									</Text>
+								</View>
+							)}
+						</View>
+					</View>
+				)}
+
+				{step === 3 && (
+					<View className="py-4">
+						<Text className={`${colors.textClass} text-2xl font-black mb-2`}>
+							Pilih Mode Kerja
+						</Text>
+						<Text className={`${colors.subTextClass} text-xs mb-6`}>
+							Pilih mode eksekusi untuk KillApps.
+						</Text>
+
+						<Pressable
+							onPress={() => {
+								updateSetting("workingMode", "shizuku");
+								setIsVerifying(true);
+								checkShizukuStatus().finally(() => setIsVerifying(false));
+							}}
+							className={`p-5 rounded-2xl mb-4 border transition-all ${
+								currentMode === "shizuku"
+									? isDark
+										? "bg-zinc-800 border-white"
+										: "bg-zinc-200 border-black"
+									: `${colors.cardClass} ${colors.cardBorderClass}`
+							}`}
+						>
+							<View className="flex-row items-center justify-between">
+								<View className="flex-row items-center gap-3">
+									<Terminal size={20} color={colors.iconColor} />
+									<Text className={`font-bold text-base ${colors.textClass}`}>
+										Mode Non-Root (Shizuku)
+									</Text>
+								</View>
+								{currentMode === "shizuku" && (
+									<Check size={20} color={colors.iconColor} />
+								)}
+							</View>
+						</Pressable>
+
+						<Pressable
+							onPress={() => {
+								updateSetting("workingMode", "root");
+								setIsVerifying(true);
+								checkRootStatus().finally(() => setIsVerifying(false));
+							}}
+							className={`p-5 rounded-2xl mb-6 border transition-all ${
+								currentMode === "root"
+									? isDark
+										? "bg-zinc-800 border-white"
+										: "bg-zinc-200 border-black"
+									: `${colors.cardClass} ${colors.cardBorderClass}`
+							}`}
+						>
+							<View className="flex-row items-center justify-between">
+								<View className="flex-row items-center gap-3">
+									<Zap size={20} color={colors.iconColor} />
+									<Text className={`font-bold text-base ${colors.textClass}`}>
+										Mode Root (Superuser)
+									</Text>
+								</View>
+								{currentMode === "root" && (
+									<Check size={20} color={colors.iconColor} />
+								)}
+							</View>
+						</Pressable>
+
+						<View
+							className={`p-4 rounded-2xl border ${colors.cardBorderClass} ${colors.cardClass} flex-row items-center justify-between`}
+						>
+							<View className="flex-row items-center gap-3 flex-1">
+								{isVerifying ? (
+									<ActivityIndicator size="small" color={colors.iconColor} />
+								) : isModeVerified ? (
+									<Check size={20} color={colors.iconColor} />
+								) : (
+									<ShieldAlert size={20} color={colors.iconColor} />
+								)}
+								<View className="flex-1 mr-2">
+									<Text className={`${colors.textClass} font-bold text-xs`}>
+										Status: {currentMode === "root" ? "Root" : "Shizuku"}
+									</Text>
+									<Text className={`${colors.subTextClass} text-[11px]`}>
+										{isVerifying
+											? "Memeriksa status..."
+											: isModeVerified
+												? "Layanan aktif & siap digunakan"
+												: currentMode === "root"
+													? "Superuser tidak terdeteksi / ditolak"
+													: isShizukuActive && !isPermissionGranted
+														? "Shizuku berjalan, izin belum diberikan"
+														: "Shizuku tidak aktif"}
+									</Text>
+								</View>
+							</View>
+
+							{!isVerifying && !isModeVerified && (
+								<Pressable
+									onPress={() => {
+										if (
+											currentMode === "shizuku" &&
+											isShizukuActive &&
+											!isPermissionGranted
+										) {
+											requestShizukuPermission();
+										} else {
+											startVerification();
+										}
+									}}
+									className={`px-3 py-1.5 rounded border ${colors.primaryBtnClass}`}
+								>
+									<Text
+										className={`text-[10px] font-black uppercase ${colors.primaryBtnTextClass}`}
+									>
+										{currentMode === "shizuku" &&
+										isShizukuActive &&
+										!isPermissionGranted
+											? "MINTA IZIN"
+											: "CEK ULANG"}
+									</Text>
+								</Pressable>
+							)}
+						</View>
+					</View>
+				)}
+			</ScrollView>
+
+			<View
+				className={`p-6 border-t ${colors.borderClass} ${colors.bgClass} flex-row justify-between items-center`}
+			>
+				{step > 1 ? (
+					<Pressable
+						onPress={() => setStep(step - 1)}
+						className={`${colors.secondaryBtnClass} px-5 py-3 rounded-xl active:opacity-70`}
+					>
+						<Text
+							className={`${colors.secondaryBtnTextClass} font-bold text-sm`}
+						>
+							Kembali
+						</Text>
+					</Pressable>
+				) : (
+					<View />
+				)}
+
+				{step < 3 ? (
+					<Pressable
+						onPress={() => setStep(step + 1)}
+						disabled={step === 2 && !allPermsGranted}
+						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all ${
+							step !== 2 || allPermsGranted
+								? `${colors.primaryBtnClass} active:opacity-80`
+								: `${colors.cardClass} opacity-50`
+						}`}
+					>
+						<Text
+							className={`font-black text-sm ${
+								step !== 2 || allPermsGranted
+									? colors.primaryBtnTextClass
+									: colors.subTextClass
+							}`}
+						>
+							Lanjut
+						</Text>
+					</Pressable>
+				) : (
+					<Pressable
+						onPress={completeOnboarding}
+						disabled={!isModeVerified || isVerifying}
+						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all ${
+							isModeVerified && !isVerifying
+								? `${colors.primaryBtnClass} active:opacity-80`
+								: `${colors.cardClass} opacity-50`
+						}`}
+					>
+						<Text
+							className={`font-black text-sm ${
+								isModeVerified && !isVerifying
+									? colors.primaryBtnTextClass
+									: colors.subTextClass
+							}`}
+						>
+							Masuk ke Aplikasi Utama
+						</Text>
+						{isModeVerified && !isVerifying && (
+							<Check size={18} color={isDark ? "#000" : "#fff"} />
+						)}
+					</Pressable>
+				)}
+			</View>
+		</View>
+	);
+};

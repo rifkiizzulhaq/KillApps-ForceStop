@@ -1,7 +1,7 @@
 import { Check, Shield, X } from "lucide-react-native";
 import type React from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
+import { useTheme } from "../../hooks/useTheme";
 
 export interface SelectionOption {
 	id: string;

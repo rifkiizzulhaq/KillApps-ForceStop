@@ -1,9 +1,9 @@
 import { Check } from "lucide-react-native";
 import type React from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { useAppStore } from "../stores/useAppStore";
-import type { AppInfo } from "../types/app";
+import { useTheme } from "../../hooks/useTheme";
+import { useAppStore } from "../../stores/useAppStore";
+import type { AppInfo } from "../../types/app";
 
 interface Props {
 	app: AppInfo;

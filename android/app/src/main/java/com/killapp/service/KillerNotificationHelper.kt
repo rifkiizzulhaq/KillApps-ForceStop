@@ -1,4 +1,4 @@
-package com.killapp
+package com.killapp.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -106,14 +106,8 @@ class KillerNotificationHelper(private val context: Context) {
                 isBgServiceNotifShown = true
             }
 
-            if (!force && currentTargetsString == lastActiveTargetsString) {
-                val expectedId = if (activeTargets.size == 1) Math.abs(activeTargets.first().hashCode()) + 1000 else if (activeTargets.size > 1) 999 else -1
-                val isShown = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && expectedId != -1) {
-                    notificationManager.activeNotifications.any { it.id == expectedId }
-                } else true
-                if (isShown) {
-                    return
-                }
+            if (!force && currentTargetsString == lastActiveTargetsString && isBgServiceNotifShown) {
+                return
             }
             lastActiveTargetsString = currentTargetsString
 

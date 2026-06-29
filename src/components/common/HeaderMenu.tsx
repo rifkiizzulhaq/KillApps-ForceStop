@@ -2,7 +2,7 @@ import { Check, MoreVertical } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
+import { useTheme } from "../../hooks/useTheme";
 
 export interface MenuOption {
 	label: string;
