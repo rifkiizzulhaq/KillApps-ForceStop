@@ -32,14 +32,13 @@ export const AboutModal: React.FC = () => {
 						KillApps
 					</Text>
 					<Text className={`${colors.subTextClass} text-xs font-semibold mb-4`}>
-						Versi 1.0 (Shizuku Edition)
+						Versi 1.0
 					</Text>
 
 					<Text
 						className={`${colors.textClass} text-center text-sm leading-6 mb-6`}
 					>
-						Aplikasi pembunuh proses latar belakang massal 1-Klik alternatif
-						tanpa hak akses Root menggunakan teknologi Shizuku API.
+						Aplikasi pengoptimal baterai dan RAM untuk menutup proses latar belakang secara instan dalam 1 ketukan. Mendukung eksekusi cepat melalui Shizuku (Tanpa Root) maupun Root penuh.
 					</Text>
 
 					<Pressable

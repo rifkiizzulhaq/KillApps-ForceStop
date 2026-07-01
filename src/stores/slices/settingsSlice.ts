@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import { killerService, setKillerMode } from "../../services/killerService";
+import { killerService, setGeekOptions, setKillerMode } from "../../services/killerService";
 import type { KillerMode } from "../../types/app";
 import type { AppState, SettingsSlice } from "../../types/store";
 
@@ -27,6 +27,9 @@ export const createSettingsSlice: StateCreator<
 		hibernateSystemApps: false,
 		themeMode: "system",
 		smoothScroll: true,
+		aggressiveDoze: false,
+		gcmWakeupBypass: true,
+		deepTrimMemory: false,
 	},
 
 	setCurrentScreen: (screen) => {
@@ -46,6 +49,11 @@ export const createSettingsSlice: StateCreator<
 			if (key === "hibernateSystemApps") {
 				updates.showSystemApps = value as boolean;
 			}
+			setGeekOptions(
+				newSettings.aggressiveDoze ?? false,
+				newSettings.gcmWakeupBypass ?? true,
+				newSettings.deepTrimMemory ?? false,
+			);
 			return updates;
 		});
 	},
@@ -60,7 +68,18 @@ export const createSettingsSlice: StateCreator<
 		});
 	},
 
-	setHydrated: (stateVal) => set({ isHydrated: stateVal }),
+	setHydrated: (stateVal) => {
+		set((state) => {
+			if (stateVal) {
+				setGeekOptions(
+					state.settings?.aggressiveDoze ?? false,
+					state.settings?.gcmWakeupBypass ?? true,
+					state.settings?.deepTrimMemory ?? false,
+				);
+			}
+			return { isHydrated: stateVal };
+		});
+	},
 	completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 	resetOnboarding: () => {
 		killerService.setQuickActionNotification(false);
@@ -86,6 +105,9 @@ export const createSettingsSlice: StateCreator<
 				hibernateSystemApps: false,
 				themeMode: "system",
 				smoothScroll: true,
+				aggressiveDoze: false,
+				gcmWakeupBypass: true,
+				deepTrimMemory: false,
 			},
 		}));
 	},

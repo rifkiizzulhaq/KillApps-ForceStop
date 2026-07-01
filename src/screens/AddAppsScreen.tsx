@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Search, X } from "lucide-react-native";
+import { ArrowLeft, Check, Info, Search, X } from "lucide-react-native";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -140,6 +140,22 @@ export const AddAppsScreen: React.FC = () => {
 			</View>
 
 			<View className="px-4 pt-3 pb-1">
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl p-3.5 mb-3`}
+				>
+					<View className="flex-row items-center gap-2 mb-1.5">
+						<Info size={16} color={colors.iconColor} />
+						<Text className={`${colors.textClass} font-bold text-xs`}>
+							Panduan Memilih Aplikasi & Apa itu GCM?
+						</Text>
+					</View>
+					<Text className={`${colors.subTextClass} text-[11px] leading-4`}>
+						• <Text className="font-bold">Sangat Disarankan:</Text> Sosmed, game, & e-commerce (Shopee/IG/TikTok) yang boros baterai di latar belakang.{"\n"}
+						• <Text className="font-bold">Hindari:</Text> Aplikasi perpesanan utama (WhatsApp/Telegram) atau alarm agar tidak telat terima notifikasi penting.{"\n"}
+						• <Text className="font-bold">Fungsi GCM Bypass:</Text> Google Cloud Messaging adalah layanan notifikasi promo. Aplikasi yang dipilih ke daftar ini tidak akan bisa diam-diam hidup kembali saat menerima promo jika GCM Bypass aktif di pengaturan.
+					</Text>
+				</View>
+
 				<View
 					className={`flex-row items-center ${colors.inputBgClass} border ${colors.borderClass} rounded-xl px-3.5 py-2.5`}
 				>

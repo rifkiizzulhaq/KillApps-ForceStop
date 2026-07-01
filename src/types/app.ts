@@ -29,4 +29,7 @@ export interface AppSettings {
 	hibernateSystemApps: boolean;
 	themeMode?: "system" | "light" | "dark";
 	smoothScroll?: boolean;
+	aggressiveDoze?: boolean;
+	gcmWakeupBypass?: boolean;
+	deepTrimMemory?: boolean;
 }

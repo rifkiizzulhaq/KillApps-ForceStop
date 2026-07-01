@@ -1,4 +1,4 @@
-import { ArrowRight, RotateCcw } from "lucide-react-native";
+import { AlertTriangle, ArrowRight, RotateCcw } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -296,12 +296,54 @@ export const SettingsMainTab: React.FC = () => {
 						onValueChange={(v) => updateSetting("dontRemoveNotif", v)}
 					/>
 				</View>
+
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					7. Fitur Ekstrem 
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 px-4 py-3 divide-y ${colors.dividerClass}`}
+				>
+					<View className="pb-3 mb-1">
+						<View className="flex-row items-center gap-1.5 mb-1">
+							<AlertTriangle size={15} color="#f59e0b" />
+							<Text className={`${colors.textClass} font-black text-xs`}>
+								Pahami Sebelum Mengaktifkan!
+							</Text>
+						</View>
+						<Text className={`${colors.subTextClass} text-[11px] leading-4`}>
+							Fitur di bawah ini mengintervensi sistem Android secara agresif. Jangan asal aktifkan jika Anda tidak membutuhkan efisiensi ekstrem.
+						</Text>
+					</View>
+
+					<SettingToggleRow
+						title="Aggressive Doze Mode"
+						subtitle="Normalnya HP menunggu 30-60 menit setelah layar mati untuk tidur hemat daya. Fitur ini memaksa sistem langsung tertidur lelap detik itu juga. Contoh: Baterai tetap utuh 100% saat ditaruh di saku/tidur malam."
+						value={settings?.aggressiveDoze ?? false}
+						onValueChange={(v) => updateSetting("aggressiveDoze", v)}
+					/>
+
+					<SettingToggleRow
+						title="GCM Push Wake-up Bypass"
+						subtitle="Seringkali aplikasi e-commerce/medsos yang dibunuh tiba-tiba hidup lagi karena ada sinyal promo dari server Google. Fitur ini memblokir sinyal kebangkitan itu. Contoh: Shopee/IG benar-benar mati total sampai Anda klik sendiri."
+						value={settings?.gcmWakeupBypass ?? true}
+						onValueChange={(v) => updateSetting("gcmWakeupBypass", v)}
+					/>
+
+					<SettingToggleRow
+						title="Deep Trim Memory"
+						subtitle="Setelah aplikasi dimatikan, sisa cache sampah masih tertahan di RAM. Fitur ini menyapu bersih sisa memori sampai akar. Contoh: RAM kosong melonjak lega & HP langsung terasa jauh lebih cepat (anti-lemot)."
+						value={settings?.deepTrimMemory ?? false}
+						onValueChange={(v) => updateSetting("deepTrimMemory", v)}
+					/>
+				</View>
 			</View>
 
 			<Text
 				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
 			>
-				10. SISTEM / RESET
+				8. Sistem & Reset
 			</Text>
 			<View
 				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2`}

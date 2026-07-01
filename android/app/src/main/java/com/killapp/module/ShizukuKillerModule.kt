@@ -77,6 +77,16 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     @ReactMethod
+    fun setGeekOptions(aggressiveDoze: Boolean, gcmWakeupBypass: Boolean, deepTrimMemory: Boolean) {
+        val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean("aggressiveDoze", aggressiveDoze)
+            .putBoolean("gcmWakeupBypass", gcmWakeupBypass)
+            .putBoolean("deepTrimMemory", deepTrimMemory)
+            .apply()
+    }
+
+    @ReactMethod
     fun checkBinder(promise: Promise) {
         try {
             val isBinderAlive = Shizuku.pingBinder()
@@ -189,15 +199,29 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             val successList = mutableListOf<String>()
             val failedList = mutableListOf<String>()
             try {
+                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                val gcmBypass = prefs.getBoolean("gcmWakeupBypass", true)
+                val deepTrim = prefs.getBoolean("deepTrimMemory", false)
+                val aggDoze = prefs.getBoolean("aggressiveDoze", false)
+
                 val suProcess = Runtime.getRuntime().exec("su")
                 val os = java.io.DataOutputStream(suProcess.outputStream)
                 for (i in 0 until packageNames.size()) {
                     val pkg = packageNames.getString(i)
                     if (!pkg.isNullOrEmpty()) {
                         os.writeBytes("am force-stop $pkg\n")
+                        if (gcmBypass) {
+                            os.writeBytes("cmd appops set $pkg RUN_IN_BACKGROUND ignore\n")
+                        }
                         os.flush()
                         successList.add(pkg)
                     }
+                }
+                if (deepTrim) {
+                    os.writeBytes("am send-trim-memory --user 0 RUNNING_CRITICAL\n")
+                }
+                if (aggDoze) {
+                    os.writeBytes("dumpsys deviceidle force-idle\n")
                 }
                 os.writeBytes("exit\n")
                 os.flush()
@@ -305,6 +329,11 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             val method = clazz.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
             method.isAccessible = true
 
+            val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            val gcmBypass = prefs.getBoolean("gcmWakeupBypass", true)
+            val deepTrim = prefs.getBoolean("deepTrimMemory", false)
+            val aggDoze = prefs.getBoolean("aggressiveDoze", false)
+
             for (i in 0 until packageNames.size()) {
                 val pkg = packageNames.getString(i)
                 try {
@@ -312,12 +341,22 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                     val exitCode = process.waitFor()
                     if (exitCode == 0) {
                         successList.pushString(pkg)
+                        if (gcmBypass) {
+                            try { method.invoke(null, arrayOf("sh", "-c", "cmd appops set $pkg RUN_IN_BACKGROUND ignore"), null, null) } catch (e: Exception) {}
+                        }
                     } else {
                         failedList.pushString(pkg)
                     }
                 } catch (e: Exception) {
                     failedList.pushString(pkg)
                 }
+            }
+
+            if (deepTrim) {
+                try { method.invoke(null, arrayOf("sh", "-c", "am send-trim-memory --user 0 RUNNING_CRITICAL"), null, null) } catch (e: Exception) {}
+            }
+            if (aggDoze) {
+                try { method.invoke(null, arrayOf("sh", "-c", "dumpsys deviceidle force-idle"), null, null) } catch (e: Exception) {}
             }
 
             val resultMap = Arguments.createMap()

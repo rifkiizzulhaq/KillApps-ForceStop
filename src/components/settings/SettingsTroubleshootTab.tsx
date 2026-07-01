@@ -1,4 +1,4 @@
-import { Info, Rocket, Settings, Wrench, Zap } from "lucide-react-native";
+import { BookOpen, HelpCircle, Info, ShieldCheck, Sparkles, Zap } from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -17,7 +17,7 @@ export const SettingsTroubleshootTab: React.FC = () => {
 		content: "",
 	});
 
-	const showTroubleGuide = (title: string, content: string) => {
+	const showGuide = (title: string, content: string) => {
 		setInfoModal({ visible: true, title, content });
 	};
 
@@ -26,26 +26,86 @@ export const SettingsTroubleshootTab: React.FC = () => {
 			<Text
 				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
 			>
-				10. Troubleshooting (Pusat Bantuan)
+				Panduan & Penjelasan Fitur Utama
 			</Text>
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-4 p-2 divide-y ${colors.dividerClass}`}
+				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2 divide-y ${colors.dividerClass}`}
 			>
 				<Pressable
 					onPress={() =>
-						showTroubleGuide(
-							"1. Aplikasi tidak mati otomatis (Auto KillApps)",
-							"Jika aplikasi tidak otomatis mati:\n\n• Wake-up Tracker: Aktifkan fitur ini di tab utama untuk mendeteksi aplikasi mana yang membangunkan proses.\n• Quick Action Notification: Gunakan pintasan di panel notifikasi untuk mematikan secara instan.",
+						showGuide(
+							"1. Mode Shizuku vs Root Akses",
+							"Pahami perbedaan mode kerja KillApps:\n\n• Mode Shizuku \nMenggunakan jalur resmi Android (ADB) untuk mematikan aplikasi di latar belakang secara kilat tanpa perlu merusak sistem atau menghilangkan garansi ponsel.\n\n• Mode Root Akses:\nDiperuntukkan khusus bagi ponsel yang sudah dimodifikasi (Rooted). Mengeksekusi perintah langsung ke jantung sistem Android (Superuser)."
 						)
 					}
 					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
 					<View className="flex-1 pr-3">
 						<Text className={`${colors.textClass} font-bold text-sm`}>
-							1. Aplikasi tidak mati otomatis
+							Mode Shizuku vs Root Akses
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Berisi Wake-up tracker dan solusi Quick action notification.
+							Penjelasan cara kerja eksekusi pembersihan latar belakang.
+						</Text>
+					</View>
+					<ShieldCheck size={18} color={colors.subIconColor} />
+				</Pressable>
+
+				<Pressable
+					onPress={() =>
+						showGuide(
+							"2. Smart KillApps & Finer Detection",
+							"Jangan khawatir musik mati tiba-tiba!\n\n• Smart KillApps:\nMenganalisis apakah aplikasi sedang melakukan tugas penting sebelum dimatikan.\n\n• Finer Detection (Media Playback):\nSecara otomatis mengenali dan melewati pemutar musik (seperti Spotify, YouTube Music) atau navigasi Maps yang sedang berjalan agar suara tidak terpotong."
+						)
+					}
+					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
+				>
+					<View className="flex-1 pr-3">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Smart KillApps & Finer Detection
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Perlindungan pemutar musik & aplikasi yang sedang bertugas.
+						</Text>
+					</View>
+					<Sparkles size={18} color={colors.subIconColor} />
+				</Pressable>
+
+				<Pressable
+					onPress={() =>
+						showGuide(
+							"3. KillApps Dangkal vs Mendalam",
+							"Dua tingkat penghentian aplikasi:\n\n• KillApps Dangkal (Shallow):\nMembekukan sementara aktivitas aplikasi (seperti menaruhnya di kulkas). Aplikasi tidak memakan baterai, namun bisa dibuka kembali dengan sekejap.\n\n• KillApps Mendalam (Force Stop):\nMenutup paksa total seluruh sistem aplikasi dari memori sampai Anda membukanya kembali secara manual."
+						)
+					}
+					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
+				>
+					<View className="flex-1 pr-3">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							KillApps Dangkal vs Mendalam
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Perbedaan membekukan sementara vs menutup paksa total.
+						</Text>
+					</View>
+					<BookOpen size={18} color={colors.subIconColor} />
+				</Pressable>
+
+				<Pressable
+					onPress={() =>
+						showGuide(
+							"4. Otomatisasi & Pengecualian Baterai",
+							"Biar HP membersihkan dirinya sendiri saat tidur!\n\n• Otomatis KillApps:\nSistem otomatis menyapu bersih aplikasi di latar belakang sesaat setelah Anda mematikan layar dan mengunci ponsel.\n\n• Abaikan Optimasi Baterai:\nWajib diaktifkan agar sistem Android tidak menahan atau mematikan timer otomatis KillApps saat layar ponsel padam."
+						)
+					}
+					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
+				>
+					<View className="flex-1 pr-3">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Otomatisasi & Pengecualian
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Panduan penghentian otomatis saat layar ponsel dimatikan.
 						</Text>
 					</View>
 					<Info size={18} color={colors.subIconColor} />
@@ -53,90 +113,71 @@ export const SettingsTroubleshootTab: React.FC = () => {
 
 				<Pressable
 					onPress={() =>
-						showTroubleGuide(
-							"2. Diagnosa Auto KillApps",
-							"Pastikan izin Shizuku tidak dicabut oleh sistem manajemen baterai agresif (seperti MIUI / ColorOS / FuntouchOS). Kunci aplikasi KillApps di recent apps agar tidak terbunuh.",
+						showGuide(
+							"5. Fitur Ekstrem",
+							"Fitur intervensi sistem tingkat lanjut untuk penghematan daya & RAM agresif:\n\n1. Aggressive Doze Mode:\nMemaksa HP langsung masuk mode tidur hemat daya mendalam detik itu juga saat layar mati.\n\n2. GCM Push Wake-up Bypass:\nMencegah notifikasi promo e-commerce (Shopee/Tokopedia/IG) membangunkan kembali aplikasi yang sudah dibunuh.\n\n3. Deep Trim Memory:\nMenyapu bersih sisa sampah cache di RAM hingga akar, membuat RAM melonjak lega dan anti-lemot."
 						)
 					}
 					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
 					<View className="flex-1 pr-3">
 						<Text className={`${colors.textClass} font-bold text-sm`}>
-							2. Diagnosa Auto KillApps
+							Fitur Ekstrem
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Diagnosa kendala penghentian otomatis di latar belakang.
+							Penjelasan Aggressive Doze, GCM Bypass, & Deep Trim RAM.
 						</Text>
 					</View>
-					<Wrench size={18} color={colors.subIconColor} />
+					<Zap size={18} color={colors.subIconColor} />
 				</Pressable>
 
 				<Pressable
 					onPress={() =>
-						showTroubleGuide(
-							"3. Accessibility Service",
-							'Jika mode Shizuku tidak tersedia, layanan Aksesibilitas dapat digunakan sebagai alternatif untuk menekan tombol "Force Stop" secara otomatis di pengaturan Android.',
+						showGuide(
+							"Panduan Memilih Aplikasi & Apa itu GCM?",
+							"Tips memilih aplikasi untuk dimasukkan ke daftar utama KillApps:\n\n• Sangat Disarankan:\nAplikasi media sosial (TikTok, IG, FB), game, e-commerce (Shopee, Tokopedia), dan browser yang sering berjalan di latar belakang serta boros baterai/RAM.\n\n• Jangan Dimasukkan:\nAplikasi perpesanan utama (WhatsApp, Telegram) jika Anda tidak ingin terlambat menerima pesan atau telepon darurat, serta pemutar musik & alarm.\n\n• Apa itu GCM (Google Cloud Messaging)?\nGCM adalah layanan pengirim pesan/notifikasi latar belakang dari Google. Aplikasi e-commerce sering memakai GCM untuk diam-diam menghidupkan diri di latar belakang saat mengirim promo. Dengan memilih aplikasi masuk ke KillApps dan mengaktifkan GCM Bypass, kebangkitan diam-diam tersebut akan diblokir."
 						)
 					}
 					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
 					<View className="flex-1 pr-3">
 						<Text className={`${colors.textClass} font-bold text-sm`}>
-							3. Accessibility Service
+							Cara Memilih Aplikasi & Apa itu GCM?
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Pengaturan layanan bantuan otomatisasi tanpa Shizuku.
+							Panduan memilih aplikasi dan fungsi penangkal GCM.
 						</Text>
 					</View>
-					<Settings size={18} color={colors.subIconColor} />
+					<Info size={18} color={colors.subIconColor} />
 				</Pressable>
 			</View>
 
 			<Text
-				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-2`}
 			>
-				12. Eksklusif & Lanjutan
+				Solusi Kendala & Troubleshooting
 			</Text>
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2`}
+				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2 divide-y ${colors.dividerClass}`}
 			>
 				<Pressable
 					onPress={() =>
-						showTroubleGuide(
-							"Extras for Geek",
-							"Selamat datang di zona Geek!\n\n• Aggressive Doze: Memaksa Android langsung masuk ke mode Doze mendalam.\n• GCM Push Wake-up Bypass: Mengabaikan kebangkitan paksa oleh Google Cloud Messaging.\n• Deep Trim Memory: Membersihkan cache RAM setelah proses KillApps.",
+						showGuide(
+							"Solusi: Aplikasi Tetap Hidup Kembali",
+							"Jika aplikasi tertentu sering hidup kembali setelah di-Kill:\n\n1. Aktifkan fitur 'GCM Push Wake-up Bypass' di Fitur Utama (Seksi 7).\n2. Aktifkan 'Wake-up Tracking and Cut-off' di Seksi 4.\n3. Periksa pengaturan auto-start bawaan ponsel (seperti Security/Phone Manager di MIUI/ColorOS) dan matikan izin autostart aplikasi tersebut."
 						)
 					}
 					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
 					<View className="flex-1 pr-3">
-						<View className="flex-row items-center gap-2">
-							<View className="flex-row items-center gap-1.5">
-								<Zap
-									size={15}
-									color={colors.iconColor}
-									fill={colors.iconColor}
-								/>
-								<Text className={`${colors.textClass} font-black text-sm`}>
-									Extras for Geek
-								</Text>
-							</View>
-							<View
-								className={`${colors.secondaryBtnClass} px-2 py-0.5 rounded border ${colors.borderClass}`}
-							>
-								<Text
-									className={`text-[9px] font-black ${colors.secondaryBtnTextClass} uppercase`}
-								>
-									PRO
-								</Text>
-							</View>
-						</View>
-						<Text className={`${colors.subTextClass} text-[11px] mt-1`}>
-							Kumpulan fitur eksperimental tingkat lanjut untuk pengguna mahir
-							dan developer.
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Mengapa Aplikasi Hidup Sendiri?
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Solusi menangkal aplikasi bandel yang suka terbangun lagi.
 						</Text>
 					</View>
-					<Rocket size={20} color={colors.iconColor} />
+					<HelpCircle size={18} color={colors.subIconColor} />
 				</Pressable>
 			</View>
 

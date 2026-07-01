@@ -87,7 +87,7 @@ export const SettingsModal: React.FC = () => {
 										: colors.captionClass
 								}`}
 							>
-								Troubleshooting & Geeks
+								Panduan & Penjelasan
 							</Text>
 						</Pressable>
 					</View>

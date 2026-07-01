@@ -145,6 +145,24 @@ export const setKillerMode = (mode: KillerMode): void => {
 	}
 };
 
+export const setGeekOptions = (
+	aggressiveDoze: boolean,
+	gcmWakeupBypass: boolean,
+	deepTrimMemory: boolean,
+): void => {
+	if (
+		Platform.OS === "android" &&
+		ShizukuKillerModule &&
+		ShizukuKillerModule.setGeekOptions
+	) {
+		ShizukuKillerModule.setGeekOptions(
+			aggressiveDoze,
+			gcmWakeupBypass,
+			deepTrimMemory,
+		);
+	}
+};
+
 export const getKillerService = (
 	mode: KillerMode = currentMode,
 ): IKillerService => {
