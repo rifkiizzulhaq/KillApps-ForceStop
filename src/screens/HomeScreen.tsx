@@ -162,12 +162,19 @@ export const HomeScreen: React.FC = () => {
 			<View
 				className={`flex-row items-center justify-between px-6 py-4 border-b ${colors.borderClass} ${colors.bgClass}`}
 			>
-				<View>
-					<Text
-						className={`text-2xl font-black ${colors.textClass} tracking-wider`}
-					>
-						KILL<Text className={colors.subTextClass}>APPS</Text>
-					</Text>
+				<View className="shrink-0">
+					<View className="flex-row items-baseline shrink-0">
+						<Text
+							className={`text-2xl font-black ${colors.textClass} tracking-wider shrink-0`}
+						>
+							KILL
+						</Text>
+						<Text
+							className={`text-2xl font-black ${colors.subTextClass} tracking-wider shrink-0`}
+						>
+							APPS
+						</Text>
+					</View>
 					<Text className={`${colors.subTextClass} text-xs font-semibold`}>
 						KillApps - Penghemat Baterai & RAM
 					</Text>

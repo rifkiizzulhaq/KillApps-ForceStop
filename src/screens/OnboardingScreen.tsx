@@ -25,7 +25,9 @@ export const OnboardingScreen: React.FC = () => {
 	const [step, setStep] = useState<number>(1);
 	const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-	const [notifGranted, setNotifGranted] = useState<boolean>(false);
+	const [notifGranted, setNotifGranted] = useState<boolean>(
+		Platform.OS !== "android" || Number(Platform.Version) < 33,
+	);
 
 	const settings = useAppStore((state) => state.settings);
 	const updateSetting = useAppStore((state) => state.updateSetting);
@@ -114,12 +116,16 @@ export const OnboardingScreen: React.FC = () => {
 	return (
 		<View className={`flex-1 ${colors.bgClass}`}>
 			<View className="px-6 pt-8 pb-4 flex-row items-center justify-between border-b border-zinc-800/20">
-				<View className="flex-row items-center gap-2">
-					<Shield size={24} color={colors.iconColor} />
+				<View className="flex-row items-baseline shrink-0">
 					<Text
-						className={`text-xl font-black ${colors.textClass} tracking-wider`}
+						className={`text-xl font-black ${colors.textClass} tracking-wider shrink-0`}
 					>
-						KILL<Text className={colors.subTextClass}>APPS</Text>
+						KILL
+					</Text>
+					<Text
+						className={`text-xl font-black ${colors.subTextClass} tracking-wider shrink-0`}
+					>
+						APPS
 					</Text>
 				</View>
 				<View className="flex-row gap-1.5 items-center">
@@ -150,35 +156,63 @@ export const OnboardingScreen: React.FC = () => {
 				contentContainerStyle={{ paddingBottom: 40 }}
 			>
 				{step === 1 && (
-					<View className="py-6">
+					<View className="py-4">
 						<View
-							className={`w-20 h-20 rounded-2xl ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-6`}
+							className={`w-16 h-16 rounded-2xl ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-5`}
 						>
-							<Zap size={36} color={colors.iconColor} />
+							<Zap size={32} color={colors.iconColor} />
 						</View>
-						<Text className={`${colors.textClass} text-2xl font-black mb-6`}>
+						<Text className={`${colors.textClass} text-2xl font-black mb-1.5`}>
 							Selamat Datang di KillApps
 						</Text>
-						<View className="w-full gap-3">
+						<Text className={`${colors.subTextClass} text-xs leading-relaxed mb-6`}>
+							Aplikasi pembersih latar belakang tingkat lanjut untuk menjaga ponsel Anda tetap cepat, hemat baterai, dan bebas lemot.
+						</Text>
+						<View className="w-full gap-3.5">
 							<View
-								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center gap-3`}
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
 							>
-								<Settings size={22} color={colors.iconColor} />
-								<Text
-									className={`${colors.textClass} font-bold text-sm flex-1`}
-								>
-									Penghentian Aplikasi Latar Belakang
-								</Text>
+								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+									<Settings size={20} color={colors.iconColor} />
+								</View>
+								<View className="flex-1">
+									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+										Penghentian Aplikasi Latar Belakang
+									</Text>
+									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
+										Menutup paksa atau membekukan aplikasi yang diam-diam berjalan di latar belakang hanya dengan 1 ketukan tanpa membuat ponsel lag.
+									</Text>
+								</View>
 							</View>
 							<View
-								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center gap-3`}
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
 							>
-								<Shield size={22} color={colors.iconColor} />
-								<Text
-									className={`${colors.textClass} font-bold text-sm flex-1`}
-								>
-									Penghematan RAM & Baterai
-								</Text>
+								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+									<Shield size={20} color={colors.iconColor} />
+								</View>
+								<View className="flex-1">
+									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+										Penghematan RAM & Baterai Maksimal
+									</Text>
+									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
+										Menyapu bersih sisa memori cache dan memotong sinyal pemicu kebangkitan aplikasi, sehingga baterai awet dan RAM melonjak lega.
+									</Text>
+								</View>
+							</View>
+							<View
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
+							>
+								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+									<Zap size={20} color={colors.iconColor} />
+								</View>
+								<View className="flex-1">
+									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+										Otomatisasi & Perlindungan Pintar
+									</Text>
+									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
+										Membersihkan otomatis saat layar ponsel dimatikan serta melindungi pemutaran musik dan navigasi GPS agar tidak terganggu.
+									</Text>
+								</View>
 							</View>
 						</View>
 					</View>
@@ -405,14 +439,18 @@ export const OnboardingScreen: React.FC = () => {
 						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all ${
 							step !== 2 || allPermsGranted
 								? `${colors.primaryBtnClass} active:opacity-80`
-								: `${colors.cardClass} opacity-50`
+								: isDark
+									? "bg-zinc-800 border border-zinc-700 opacity-80"
+									: "bg-zinc-200 border border-zinc-300 opacity-80"
 						}`}
 					>
 						<Text
 							className={`font-black text-sm ${
 								step !== 2 || allPermsGranted
 									? colors.primaryBtnTextClass
-									: colors.subTextClass
+									: isDark
+										? "text-zinc-400"
+										: "text-zinc-500"
 							}`}
 						>
 							Lanjut
@@ -424,7 +462,7 @@ export const OnboardingScreen: React.FC = () => {
 							if (!isModeVerified) {
 								Alert.alert(
 									"Layanan Belum Aktif",
-									"Silakan izinkan atau aktifkan mode Shizuku/Root terlebih dahulu agar aplikasi dapat bekerja."
+									"Silakan izinkan atau aktifkan mode Shizuku/Root terlebih dahulu agar aplikasi dapat bekerja.",
 								);
 							} else {
 								completeOnboarding();

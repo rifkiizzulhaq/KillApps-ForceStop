@@ -1,5 +1,10 @@
 import type { StateCreator } from "zustand";
-import { killerService, setGeekOptions, setKillerMode } from "../../services/killerService";
+import {
+	killerService,
+	setGeekOptions,
+	setHibernationOptions,
+	setKillerMode,
+} from "../../services/killerService";
 import type { KillerMode } from "../../types/app";
 import type { AppState, SettingsSlice } from "../../types/store";
 
@@ -22,7 +27,6 @@ export const createSettingsSlice: StateCreator<
 		autoHibernation: false,
 		ignoreBackgroundFree: true,
 		quickActionNotif: false,
-		longPressNavBar: false,
 		dontRemoveNotif: false,
 		hibernateSystemApps: false,
 		themeMode: "system",
@@ -54,6 +58,13 @@ export const createSettingsSlice: StateCreator<
 				newSettings.gcmWakeupBypass ?? true,
 				newSettings.deepTrimMemory ?? false,
 			);
+			setHibernationOptions(
+				newSettings.smartHibernation ?? true,
+				newSettings.finerMediaDetection ?? false,
+				newSettings.shallowHibernation ?? false,
+				newSettings.wakeUpTracking ?? true,
+				newSettings.dontRemoveNotif ?? false,
+			);
 			return updates;
 		});
 	},
@@ -75,6 +86,13 @@ export const createSettingsSlice: StateCreator<
 					state.settings?.aggressiveDoze ?? false,
 					state.settings?.gcmWakeupBypass ?? true,
 					state.settings?.deepTrimMemory ?? false,
+				);
+				setHibernationOptions(
+					state.settings?.smartHibernation ?? true,
+					state.settings?.finerMediaDetection ?? false,
+					state.settings?.shallowHibernation ?? false,
+					state.settings?.wakeUpTracking ?? true,
+					state.settings?.dontRemoveNotif ?? false,
 				);
 			}
 			return { isHydrated: stateVal };
@@ -100,7 +118,6 @@ export const createSettingsSlice: StateCreator<
 				autoHibernation: false,
 				ignoreBackgroundFree: true,
 				quickActionNotif: false,
-				longPressNavBar: false,
 				dontRemoveNotif: false,
 				hibernateSystemApps: false,
 				themeMode: "system",

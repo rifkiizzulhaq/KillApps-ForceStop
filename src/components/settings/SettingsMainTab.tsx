@@ -9,13 +9,13 @@ import {
 	View,
 } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
-import { useAppStore } from "../../stores/useAppStore";
-import { InfoModal } from "../modals/InfoModal";
-import { SelectionModal } from "../modals/SelectionModal";
 import {
 	checkBatteryOptimization,
 	requestBatteryOptimization,
 } from "../../services/killerService";
+import { useAppStore } from "../../stores/useAppStore";
+import { InfoModal } from "../modals/InfoModal";
+import { SelectionModal } from "../modals/SelectionModal";
 import { SettingToggleRow } from "./SettingToggleRow";
 
 export const SettingsMainTab: React.FC = () => {
@@ -33,7 +33,6 @@ export const SettingsMainTab: React.FC = () => {
 			: isShizukuActive && isPermissionGranted;
 
 	const [workingModeModal, setWorkingModeModal] = useState(false);
-	const [navBarModal, setNavBarModal] = useState(false);
 	const [rootInfoModal, setRootInfoModal] = useState(false);
 	const [batteryModal, setBatteryModal] = useState(false);
 
@@ -50,10 +49,6 @@ export const SettingsMainTab: React.FC = () => {
 
 	const handleWorkingModePress = () => {
 		setWorkingModeModal(true);
-	};
-
-	const handleLongPressNavBar = () => {
-		setNavBarModal(true);
 	};
 
 	return (
@@ -246,7 +241,8 @@ export const SettingsMainTab: React.FC = () => {
 								Abaikan Optimasi Baterai
 							</Text>
 							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-								Izinkan aplikasi berjalan tanpa batasan baterai untuk fitur otomatisasi saat layar mati.
+								Izinkan aplikasi berjalan tanpa batasan baterai untuk fitur
+								otomatisasi saat layar mati.
 							</Text>
 						</View>
 						<ArrowRight size={18} color={colors.subIconColor} />
@@ -268,27 +264,6 @@ export const SettingsMainTab: React.FC = () => {
 						onValueChange={handleQuickNotifChange}
 					/>
 
-					<Pressable
-						onPress={handleLongPressNavBar}
-						className="py-3 flex-row items-center justify-between active:opacity-70"
-					>
-						<View className="flex-1 pr-4">
-							<Text className={`${colors.textClass} font-bold text-sm`}>
-								Long-press Action on Nav-bar
-							</Text>
-							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-								Aksi cepat saat menekan lama tombol Home atau bilah navigasi
-								bawah.
-							</Text>
-						</View>
-						<View className="flex-row items-center gap-1">
-							<Text className={`${colors.textClass} font-bold text-xs`}>
-								Atur
-							</Text>
-							<ArrowRight size={14} color={colors.iconColor} />
-						</View>
-					</Pressable>
-
 					<SettingToggleRow
 						title="Don&apos;t Remove Notification"
 						subtitle="Jaga agar kartu notifikasi penting tidak ikut terhapus saat mematikan aplikasi."
@@ -300,7 +275,7 @@ export const SettingsMainTab: React.FC = () => {
 				<Text
 					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
 				>
-					7. Fitur Ekstrem 
+					7. Fitur Ekstrem
 				</Text>
 				<View
 					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 px-4 py-3 divide-y ${colors.dividerClass}`}
@@ -313,7 +288,9 @@ export const SettingsMainTab: React.FC = () => {
 							</Text>
 						</View>
 						<Text className={`${colors.subTextClass} text-[11px] leading-4`}>
-							Fitur di bawah ini mengintervensi sistem Android secara agresif. Jangan asal aktifkan jika Anda tidak membutuhkan efisiensi ekstrem.
+							Fitur di bawah ini mengintervensi sistem Android secara agresif.
+							Jangan asal aktifkan jika Anda tidak membutuhkan efisiensi
+							ekstrem.
 						</Text>
 					</View>
 
@@ -354,10 +331,11 @@ export const SettingsMainTab: React.FC = () => {
 				>
 					<View className="flex-1 pr-3">
 						<Text className="text-rose-500 font-bold text-sm">
-							Reset Total (Seperti Baru Install)
+							Reset Total
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Mereset seluruh pengaturan, daftar aplikasi, dan membuka kembali layar sambutan awal dari nol.
+							Mereset seluruh pengaturan, daftar aplikasi, dan membuka kembali
+							layar sambutan awal dari nol.
 						</Text>
 					</View>
 					<RotateCcw size={20} color="#f43f5e" />
@@ -392,35 +370,6 @@ export const SettingsMainTab: React.FC = () => {
 					}
 				}}
 				onClose={() => setWorkingModeModal(false)}
-			/>
-
-			<SelectionModal
-				visible={navBarModal}
-				title="Pintasan Bilah Navigasi"
-				subtitle="Pilih aksi eksekusi cepat saat tombol Home atau Navigasi ditekan lama:"
-				options={[
-					{
-						id: "true",
-						label: "Kill Semua & Matikan Layar",
-						badge: "AKTIF",
-						badgeType: "emerald",
-						description:
-							"Eksekusi pembersihan instan dan langsung memadamkan layar ponsel Anda.",
-					},
-					{
-						id: "false",
-						label: "Nonaktifkan",
-						badge: "MATI",
-						badgeType: "default",
-						description:
-							"Tidak melakukan aksi apapun saat tombol ditekan lama.",
-					},
-				]}
-				selectedId={String(settings?.longPressNavBar ?? false)}
-				onSelect={(id) => {
-					updateSetting("longPressNavBar", id === "true");
-				}}
-				onClose={() => setNavBarModal(false)}
 			/>
 
 			<InfoModal

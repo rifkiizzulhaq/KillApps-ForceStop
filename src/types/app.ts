@@ -24,7 +24,6 @@ export interface AppSettings {
 	autoHibernation: boolean;
 	ignoreBackgroundFree: boolean;
 	quickActionNotif: boolean;
-	longPressNavBar: boolean;
 	dontRemoveNotif: boolean;
 	hibernateSystemApps: boolean;
 	themeMode?: "system" | "light" | "dark";

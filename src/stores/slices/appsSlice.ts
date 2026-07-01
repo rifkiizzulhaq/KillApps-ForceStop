@@ -84,7 +84,9 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			const fetchedApps = await killerService.getInstalledApps();
 			fetchedApps.sort((a, b) => a.appName.localeCompare(b.appName));
 			const currentSelected = new Set(
-				get().apps.filter((a) => a.isSelected).map((a) => a.packageName),
+				get()
+					.apps.filter((a) => a.isSelected)
+					.map((a) => a.packageName),
 			);
 			const apps = fetchedApps.map((app) => ({
 				...app,

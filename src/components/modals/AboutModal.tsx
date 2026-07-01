@@ -17,7 +17,10 @@ export const AboutModal: React.FC = () => {
 			onRequestClose={() => setCurrentScreen("home")}
 		>
 			<View className="flex-1 bg-black/80 justify-end">
-				<Pressable className="flex-1" onPress={() => setCurrentScreen("home")} />
+				<Pressable
+					className="flex-1"
+					onPress={() => setCurrentScreen("home")}
+				/>
 				<View
 					className={`${colors.modalBgClass} border-t ${colors.borderClass} rounded-t-3xl p-6 pb-8 items-center`}
 				>
@@ -38,7 +41,9 @@ export const AboutModal: React.FC = () => {
 					<Text
 						className={`${colors.textClass} text-center text-sm leading-6 mb-6`}
 					>
-						Aplikasi pengoptimal baterai dan RAM untuk menutup proses latar belakang secara instan dalam 1 ketukan. Mendukung eksekusi cepat melalui Shizuku (Tanpa Root) maupun Root penuh.
+						Aplikasi pengoptimal baterai dan RAM untuk menutup proses latar
+						belakang secara instan dalam 1 ketukan. Mendukung eksekusi cepat
+						melalui Shizuku (Tanpa Root) maupun Root penuh.
 					</Text>
 
 					<Pressable

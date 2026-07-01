@@ -150,9 +150,15 @@ export const AddAppsScreen: React.FC = () => {
 						</Text>
 					</View>
 					<Text className={`${colors.subTextClass} text-[11px] leading-4`}>
-						• <Text className="font-bold">Sangat Disarankan:</Text> Sosmed, game, & e-commerce (Shopee/IG/TikTok) yang boros baterai di latar belakang.{"\n"}
-						• <Text className="font-bold">Hindari:</Text> Aplikasi perpesanan utama (WhatsApp/Telegram) atau alarm agar tidak telat terima notifikasi penting.{"\n"}
-						• <Text className="font-bold">Fungsi GCM Bypass:</Text> Google Cloud Messaging adalah layanan notifikasi promo. Aplikasi yang dipilih ke daftar ini tidak akan bisa diam-diam hidup kembali saat menerima promo jika GCM Bypass aktif di pengaturan.
+						• <Text className="font-bold">Sangat Disarankan:</Text> Sosmed,
+						game, & e-commerce (Shopee/IG/TikTok) yang boros baterai di latar
+						belakang.{"\n"}• <Text className="font-bold">Hindari:</Text>{" "}
+						Aplikasi perpesanan utama (WhatsApp/Telegram) atau alarm agar tidak
+						telat terima notifikasi penting.{"\n"}•{" "}
+						<Text className="font-bold">Fungsi GCM Bypass:</Text> Google Cloud
+						Messaging adalah layanan notifikasi promo. Aplikasi yang dipilih ke
+						daftar ini tidak akan bisa diam-diam hidup kembali saat menerima
+						promo jika GCM Bypass aktif di pengaturan.
 					</Text>
 				</View>
 
@@ -192,6 +198,7 @@ export const AddAppsScreen: React.FC = () => {
 				>
 					<SectionList
 						sections={sections}
+						decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
 						keyExtractor={(item) => item.packageName}
 						renderItem={({ item }) => <AppListItem app={item} />}
 						renderSectionHeader={({ section }) => (

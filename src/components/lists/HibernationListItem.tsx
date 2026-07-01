@@ -96,7 +96,16 @@ export const HibernationListItem: React.FC<Props> = ({
 						disabled={disabled}
 						className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${colors.primaryBtnClass} active:opacity-80`}
 					>
-						<Zap size={13} color={colors.primaryBtnTextClass.includes("white") ? "#fff" : isDark ? "#000" : "#fff"} />
+						<Zap
+							size={13}
+							color={
+								colors.primaryBtnTextClass.includes("white")
+									? "#fff"
+									: isDark
+										? "#000"
+										: "#fff"
+							}
+						/>
 						<Text
 							className={`font-black text-[10px] tracking-wider uppercase ${colors.primaryBtnTextClass}`}
 						>

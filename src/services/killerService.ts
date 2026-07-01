@@ -140,7 +140,11 @@ let currentMode: KillerMode = "shizuku";
 
 export const setKillerMode = (mode: KillerMode): void => {
 	currentMode = mode;
-	if (Platform.OS === "android" && ShizukuKillerModule && ShizukuKillerModule.setWorkingMode) {
+	if (
+		Platform.OS === "android" &&
+		ShizukuKillerModule &&
+		ShizukuKillerModule.setWorkingMode
+	) {
 		ShizukuKillerModule.setWorkingMode(mode);
 	}
 };
@@ -159,6 +163,28 @@ export const setGeekOptions = (
 			aggressiveDoze,
 			gcmWakeupBypass,
 			deepTrimMemory,
+		);
+	}
+};
+
+export const setHibernationOptions = (
+	smart: boolean,
+	finerMedia: boolean,
+	shallow: boolean,
+	wakeUp: boolean,
+	dontRemoveNotif: boolean,
+): void => {
+	if (
+		Platform.OS === "android" &&
+		ShizukuKillerModule &&
+		ShizukuKillerModule.setHibernationOptions
+	) {
+		ShizukuKillerModule.setHibernationOptions(
+			smart,
+			finerMedia,
+			shallow,
+			wakeUp,
+			dontRemoveNotif,
 		);
 	}
 };

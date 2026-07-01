@@ -9,8 +9,6 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
 
 class KillerNotificationHelper(private val context: Context) {
 
@@ -52,9 +50,7 @@ class KillerNotificationHelper(private val context: Context) {
             val isModeAlive = if (mode == "root") {
                 prefs.getBoolean("isRootActive", false)
             } else {
-                try {
-                    rikka.shizuku.Shizuku.pingBinder() && rikka.shizuku.Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-                } catch (e: Exception) { false }
+                ShizukuCommandHelper.isShizukuReady()
             }
 
             if (!quickActionNotifEnabled || !isModeAlive) {
@@ -74,18 +70,20 @@ class KillerNotificationHelper(private val context: Context) {
 
             val bgChannelId = "killapp_bg_service"
             val actionChannelId = "killapp_quick_action"
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 val bgChannel = NotificationChannel(
                     bgChannelId,
-                    "Layanan Latar Belakang",
+                    "Status Layanan Latar Belakang",
                     NotificationManager.IMPORTANCE_MIN
                 )
-                bgChannel.description = "Notifikasi layanan pemantau KillApps"
+                bgChannel.description = "Menampilkan status layanan latar belakang KillApps"
+                bgChannel.setShowBadge(false)
                 notificationManager.createNotificationChannel(bgChannel)
 
                 val actionChannel = NotificationChannel(
                     actionChannelId,
-                    "Pintasan Cepat KillApps",
+                    "Pintasan Cepat Pembunuhan Aplikasi",
                     NotificationManager.IMPORTANCE_LOW
                 )
                 actionChannel.description = "Pintasan cepat untuk mematikan aplikasi"
@@ -103,7 +101,17 @@ class KillerNotificationHelper(private val context: Context) {
                 }
             }
 
-            val currentTargetsString = activeTargets.sorted().joinToString(",")
+            val postponedRunning = autoHibernationTargets.filter { pkg ->
+                if (!postponedPackages.contains(pkg)) return@filter false
+                try {
+                    val info = pm.getApplicationInfo(pkg, 0)
+                    (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
+                } catch (e: Exception) {
+                    false
+                }
+            }
+
+            val currentTargetsString = activeTargets.sorted().joinToString(",") + "|" + postponedRunning.sorted().joinToString(",")
             if (!force && currentTargetsString == lastActiveTargetsString) {
                 return
             }
@@ -121,34 +129,40 @@ class KillerNotificationHelper(private val context: Context) {
                 PendingIntent.FLAG_UPDATE_CURRENT or (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
             )
 
+            val bgBuilder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                Notification.Builder(context, bgChannelId)
+            } else {
+                Notification.Builder(context)
+            }
+            val postponedNames = postponedRunning.map { pkg ->
+                try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+            }
+            val title = if (postponedNames.isNotEmpty()) "${postponedNames.size} aplikasi ditunda Kill Appsnya" else "KillApps Service"
+            val text = if (postponedNames.isNotEmpty()) "${postponedNames.joinToString(", ")} (dilewati saat layar padam)" else if (activeTargets.isEmpty()) "Semua aplikasi dalam kondisi bersih" else "Layanan pemantauan latar belakang aktif"
+            bgBuilder.setContentTitle(title)
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.ic_lock_power_off)
+                .setContentIntent(piLaunch)
+                .setOngoing(true)
+            notificationManager.notify(888, bgBuilder.build())
             if (activeTargets.isEmpty()) {
-                val bgBuilder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    Notification.Builder(context, bgChannelId)
-                } else {
-                    Notification.Builder(context)
-                }
-                bgBuilder.setContentTitle("KillApps Service")
-                    .setContentText("Semua aplikasi dalam kondisi bersih & hibernasi")
-                    .setSmallIcon(android.R.drawable.ic_lock_power_off)
-                    .setContentIntent(piLaunch)
-                    .setOngoing(true)
-                notificationManager.notify(888, bgBuilder.build())
                 return
             }
 
             val channelToUse = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) actionChannelId else null
+            val groupKey = "killapp_quick_group"
 
-            if (activeTargets.size == 1) {
-                val pkg = activeTargets.first()
+            for (pkg in activeTargets) {
                 val appName = try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
-                val builder = if (channelToUse != null) Notification.Builder(context, channelToUse) else Notification.Builder(context)
+                val childId = Math.abs(pkg.hashCode()) + 1000
+                activeNotifIds.add(childId)
 
                 val freezeIntent = Intent("com.killapp.ACTION_FREEZE_PKG")
                     .setPackage(context.packageName)
                     .putExtra("pkg", pkg)
                     .putExtra("name", appName)
                 val piFreeze = PendingIntent.getBroadcast(
-                    context, 8881, freezeIntent,
+                    context, childId, freezeIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
                 )
                 val actionFreeze = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
@@ -160,8 +174,9 @@ class KillerNotificationHelper(private val context: Context) {
                 val postponeIntent = Intent("com.killapp.ACTION_POSTPONE_PKG")
                     .setPackage(context.packageName)
                     .putExtra("pkg", pkg)
+                    .putExtra("name", appName)
                 val piPostpone = PendingIntent.getBroadcast(
-                    context, 8882, postponeIntent,
+                    context, childId + 1, postponeIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
                 )
                 val actionPostpone = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
@@ -170,44 +185,28 @@ class KillerNotificationHelper(private val context: Context) {
                     Notification.Action(android.R.drawable.ic_lock_power_off, "Tunda", piPostpone)
                 }
 
-                builder.setContentTitle("$appName siap di-kill")
-                    .setContentText("Ketuk tombol Kill untuk mematikan")
+                val childBuilder = if (channelToUse != null) Notification.Builder(context, channelToUse) else Notification.Builder(context)
+                childBuilder.setContentTitle(appName)
+                    .setContentText("Menunggu untuk di-kill")
+                    .setSubText("lebih banyak aksi")
                     .setSmallIcon(android.R.drawable.ic_lock_power_off)
-                    .setContentIntent(piLaunch)
+                    .setContentIntent(piFreeze)
                     .addAction(actionPostpone)
                     .addAction(actionFreeze)
                     .setOngoing(true)
-
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    childBuilder.setGroup(groupKey)
+                }
                 try {
                     val drawable = pm.getApplicationIcon(pkg)
-                    val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
-                        drawable.bitmap
-                    } else {
-                        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(bmp)
-                        drawable.setBounds(0, 0, canvas.width, canvas.height)
-                        drawable.draw(canvas)
-                        bmp
-                    }
-                    builder.setLargeIcon(bitmap)
+                    val bitmap = AppIconHelper.drawableToBitmap(drawable, 96, 96)
+                    childBuilder.setLargeIcon(bitmap)
                 } catch (e: Exception) {}
 
-                notificationManager.notify(888, builder.build())
-            } else {
-                val appNames = activeTargets.map { pkg ->
-                    try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
-                }
+                notificationManager.notify(childId, childBuilder.build())
+            }
 
-                val inboxStyle = Notification.InboxStyle()
-                for (name in appNames.take(6)) {
-                    inboxStyle.addLine("• $name")
-                }
-                if (appNames.size > 6) {
-                    inboxStyle.setSummaryText("+${appNames.size - 6} aplikasi lainnya")
-                }
-
+            if (activeTargets.size >= 2) {
                 val freezeAllIntent = Intent("com.killapp.ACTION_FREEZE_ALL").setPackage(context.packageName)
                 val piAll = PendingIntent.getBroadcast(
                     context, 8883, freezeAllIntent,
@@ -219,16 +218,30 @@ class KillerNotificationHelper(private val context: Context) {
                     Notification.Action(android.R.drawable.ic_media_pause, "Kill Semua", piAll)
                 }
 
-                val builder = if (channelToUse != null) Notification.Builder(context, channelToUse) else Notification.Builder(context)
-                builder.setContentTitle("${activeTargets.size} aplikasi berjalan di latar")
-                    .setContentText("Ketuk tombol Kill Semua untuk menghentikan")
+                val appNames = activeTargets.map { pkg ->
+                    try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+                }
+                val inboxStyle = Notification.InboxStyle()
+                for (name in appNames.take(6)) {
+                    inboxStyle.addLine("• $name")
+                }
+                if (appNames.size > 6) {
+                    inboxStyle.setSummaryText("+${appNames.size - 6} aplikasi lainnya")
+                }
+
+                val summaryBuilder = if (channelToUse != null) Notification.Builder(context, channelToUse) else Notification.Builder(context)
+                summaryBuilder.setContentTitle("${activeTargets.size} aplikasi berjalan di latar")
+                    .setContentText("Ketuk untuk mematikan semua")
+                    .setSubText("klik di bawah untuk di kill")
                     .setStyle(inboxStyle)
                     .setSmallIcon(android.R.drawable.ic_lock_power_off)
-                    .setContentIntent(piLaunch)
+                    .setContentIntent(piAll)
                     .addAction(actionKillAll)
                     .setOngoing(true)
-
-                notificationManager.notify(888, builder.build())
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    summaryBuilder.setGroup(groupKey).setGroupSummary(true)
+                }
+                notificationManager.notify(999, summaryBuilder.build())
             }
         } catch (e: Exception) {}
     }
