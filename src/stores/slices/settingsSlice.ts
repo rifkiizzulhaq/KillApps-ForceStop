@@ -20,7 +20,7 @@ export const createSettingsSlice: StateCreator<
 		shallowHibernation: false,
 		wakeUpTracking: true,
 		autoHibernation: false,
-		ignoreBackgroundFree: false,
+		ignoreBackgroundFree: true,
 		quickActionNotif: false,
 		longPressNavBar: false,
 		dontRemoveNotif: false,
@@ -62,6 +62,31 @@ export const createSettingsSlice: StateCreator<
 
 	setHydrated: (stateVal) => set({ isHydrated: stateVal }),
 	completeOnboarding: () => set({ hasCompletedOnboarding: true }),
-	resetOnboarding: () =>
-		set({ hasCompletedOnboarding: false, currentScreen: "home" }),
+	resetOnboarding: () => {
+		killerService.setQuickActionNotification(false);
+		killerService.setAutoHibernationConfig(false, []);
+		setKillerMode("shizuku");
+		set((state) => ({
+			hasCompletedOnboarding: false,
+			currentScreen: "home",
+			showSystemApps: false,
+			hibernationList: [],
+			apps: state.apps.map((app) => ({ ...app, isSelected: false })),
+			settings: {
+				workingMode: "shizuku",
+				smartHibernation: true,
+				finerMediaDetection: false,
+				shallowHibernation: false,
+				wakeUpTracking: true,
+				autoHibernation: false,
+				ignoreBackgroundFree: true,
+				quickActionNotif: false,
+				longPressNavBar: false,
+				dontRemoveNotif: false,
+				hibernateSystemApps: false,
+				themeMode: "system",
+				smoothScroll: true,
+			},
+		}));
+	},
 });

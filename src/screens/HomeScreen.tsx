@@ -1,4 +1,4 @@
-import { Brain, Plus, Search, Snowflake, X } from "lucide-react-native";
+import { Brain, Layers, Plus, Search, Snowflake, X } from "lucide-react-native";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -116,16 +116,25 @@ export const HomeScreen: React.FC = () => {
 
 	useEffect(() => {
 		killerService.setAutoHibernationConfig(
-			settings?.autoHibernation ?? false,
+			Boolean(isModeVerified && settings?.autoHibernation),
 			hibernationList,
 		);
-	}, [settings?.autoHibernation, hibernationList]);
+	}, [isModeVerified, settings?.autoHibernation, hibernationList]);
 
 	useEffect(() => {
 		killerService.setQuickActionNotification(
-			settings?.quickActionNotif ?? false,
+			Boolean(isModeVerified && settings?.quickActionNotif),
 		);
-	}, [settings?.quickActionNotif]);
+	}, [isModeVerified, settings?.quickActionNotif]);
+
+	useEffect(() => {
+		if (killMessage) {
+			const timer = setTimeout(() => {
+				clearKillMessage();
+			}, 6000);
+			return () => clearTimeout(timer);
+		}
+	}, [killMessage, clearKillMessage]);
 
 	const targetApps = apps
 		.filter((app) => hibernationList.includes(app.packageName))
@@ -135,7 +144,11 @@ export const HomeScreen: React.FC = () => {
 				app.packageName.toLowerCase().includes(searchQuery.toLowerCase()),
 		);
 
-	const activeTargetsCount = targetApps.filter((a) => !a.isStopped).length;
+	const activeApps = targetApps.filter((a) => !a.isStopped);
+	const hibernatedApps = targetApps.filter((a) => a.isStopped);
+	const activeTargetsCount = settings?.ignoreBackgroundFree
+		? activeApps.length
+		: targetApps.length;
 
 	return (
 		<View className={`flex-1 ${colors.bgClass}`}>
@@ -156,7 +169,7 @@ export const HomeScreen: React.FC = () => {
 						KILL<Text className={colors.subTextClass}>APPS</Text>
 					</Text>
 					<Text className={`${colors.subTextClass} text-xs font-semibold`}>
-						Penganalisis & KillApps 1-Klik
+						KillApps - Penghemat Baterai & RAM
 					</Text>
 				</View>
 
@@ -175,7 +188,7 @@ export const HomeScreen: React.FC = () => {
 			</View>
 
 			{!isModeVerified && (
-				<View className="px-6 pt-4">
+				<View className="px-4 pt-3">
 					<ShizukuStatusCard />
 				</View>
 			)}
@@ -183,7 +196,7 @@ export const HomeScreen: React.FC = () => {
 			{killMessage && (
 				<Pressable
 					onPress={clearKillMessage}
-					className={`mx-6 mt-4 ${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row justify-between items-center`}
+					className={`mx-4 mt-3 ${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row justify-between items-center`}
 				>
 					<View className="flex-1 mr-2">
 						<Text
@@ -235,7 +248,7 @@ export const HomeScreen: React.FC = () => {
 					<View
 						className={`w-24 h-24 rounded-full ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-6`}
 					>
-						<Snowflake size={40} color={colors.iconColor} />
+						<Layers size={40} color={colors.iconColor} />
 					</View>
 					<Text
 						className={`${colors.textClass} font-bold text-xl mb-2 text-center`}
@@ -284,11 +297,6 @@ export const HomeScreen: React.FC = () => {
 							>
 								Daftar KillApps ({targetApps.length})
 							</Text>
-							{activeTargetsCount > 0 && (
-								<Text className={`${colors.textClass} font-bold text-xs`}>
-									{activeTargetsCount} Aktif Berjalan
-								</Text>
-							)}
 						</View>
 
 						{targetApps.length === 0 ? (
@@ -307,14 +315,53 @@ export const HomeScreen: React.FC = () => {
 								</Text>
 							</View>
 						) : (
-							targetApps.map((app) => (
-								<HibernationListItem
-									key={app.packageName}
-									app={app}
-									onRemove={removeFromHibernation}
-									disabled={!isModeVerified}
-								/>
-							))
+							<View className="pb-2">
+								{activeApps.length > 0 && (
+									<View className="mb-4">
+										<View className="flex-row items-center gap-2 mb-2.5 px-2">
+											<View className="w-2 h-2 rounded-full bg-emerald-500" />
+											<Text
+												className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
+											>
+												Sedang Aktif ({activeApps.length})
+											</Text>
+										</View>
+										{activeApps.map((app) => (
+											<HibernationListItem
+												key={app.packageName}
+												app={app}
+												onRemove={removeFromHibernation}
+												onKill={killSingleApp}
+												disabled={!isModeVerified}
+											/>
+										))}
+									</View>
+								)}
+
+								{hibernatedApps.length > 0 && (
+									<View className="mb-2">
+										<View
+											className={`flex-row items-center gap-2 mb-2.5 px-2 ${activeApps.length > 0 ? "mt-2" : ""}`}
+										>
+											<View className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600" />
+											<Text
+												className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
+											>
+												Sudah Di-kill / Tertidur ({hibernatedApps.length})
+											</Text>
+										</View>
+										{hibernatedApps.map((app) => (
+											<HibernationListItem
+												key={app.packageName}
+												app={app}
+												onRemove={removeFromHibernation}
+												onKill={killSingleApp}
+												disabled={!isModeVerified}
+											/>
+										))}
+									</View>
+								)}
+							</View>
 						)}
 					</ScrollView>
 				</>

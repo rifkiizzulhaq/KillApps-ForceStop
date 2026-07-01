@@ -22,13 +22,15 @@ export const InfoModal: React.FC<InfoModalProps> = ({
 		<Modal
 			visible={visible}
 			transparent={true}
-			animationType="fade"
+			animationType="slide"
 			onRequestClose={onClose}
 		>
-			<View className="flex-1 bg-black/80 justify-center items-center px-6">
+			<View className="flex-1 bg-black/80 justify-end">
+				<Pressable className="flex-1" onPress={onClose} />
 				<View
-					className={`w-full ${colors.modalBgClass} border ${colors.borderClass} rounded-3xl p-6 shadow-2xl max-h-[80%]`}
+					className={`w-full ${colors.modalBgClass} border-t ${colors.borderClass} rounded-t-3xl p-6 pb-8 shadow-2xl max-h-[85%]`}
 				>
+					<View className="w-12 h-1.5 bg-zinc-500/30 rounded-full self-center mb-5" />
 					<View className="flex-row items-center justify-between mb-4 border-b pb-3 border-zinc-700/30">
 						<View className="flex-row items-center gap-2.5 flex-1 pr-3">
 							<View className="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-500/40 items-center justify-center">

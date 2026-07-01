@@ -29,7 +29,11 @@ function App(): React.JSX.Element | null {
 		};
 
 		checkMode();
-		const interval = setInterval(checkMode, 2000);
+		const interval = setInterval(() => {
+			if (useAppStore.getState().currentScreen !== "add_apps") {
+				checkMode();
+			}
+		}, 3000);
 
 		const sub = AppState.addEventListener("change", (nextState) => {
 			if (nextState === "active") {

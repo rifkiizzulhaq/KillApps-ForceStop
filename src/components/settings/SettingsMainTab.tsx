@@ -12,6 +12,10 @@ import { useTheme } from "../../hooks/useTheme";
 import { useAppStore } from "../../stores/useAppStore";
 import { InfoModal } from "../modals/InfoModal";
 import { SelectionModal } from "../modals/SelectionModal";
+import {
+	checkBatteryOptimization,
+	requestBatteryOptimization,
+} from "../../services/killerService";
 import { SettingToggleRow } from "./SettingToggleRow";
 
 export const SettingsMainTab: React.FC = () => {
@@ -31,6 +35,7 @@ export const SettingsMainTab: React.FC = () => {
 	const [workingModeModal, setWorkingModeModal] = useState(false);
 	const [navBarModal, setNavBarModal] = useState(false);
 	const [rootInfoModal, setRootInfoModal] = useState(false);
+	const [batteryModal, setBatteryModal] = useState(false);
 
 	const handleQuickNotifChange = async (v: boolean) => {
 		if (v && Platform.OS === "android" && Number(Platform.Version) >= 33) {
@@ -225,6 +230,27 @@ export const SettingsMainTab: React.FC = () => {
 						value={settings?.hibernateSystemApps ?? false}
 						onValueChange={(v) => updateSetting("hibernateSystemApps", v)}
 					/>
+					<Pressable
+						onPress={async () => {
+							const ignored = await checkBatteryOptimization();
+							if (ignored) {
+								setBatteryModal(true);
+							} else {
+								await requestBatteryOptimization();
+							}
+						}}
+						className="py-3 flex-row items-center justify-between active:opacity-70"
+					>
+						<View className="flex-1 pr-4">
+							<Text className={`${colors.textClass} font-semibold text-sm`}>
+								Abaikan Optimasi Baterai
+							</Text>
+							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+								Izinkan aplikasi berjalan tanpa batasan baterai untuk fitur otomatisasi saat layar mati.
+							</Text>
+						</View>
+						<ArrowRight size={18} color={colors.subIconColor} />
+					</Pressable>
 				</View>
 
 				<Text
@@ -286,11 +312,10 @@ export const SettingsMainTab: React.FC = () => {
 				>
 					<View className="flex-1 pr-3">
 						<Text className="text-rose-500 font-bold text-sm">
-							Reset Sambutan & Awal Aplikasi
+							Reset Total (Seperti Baru Install)
 						</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Membuka kembali layar panduan awal, verifikasi perizinan, dan
-							pemilihan mode kerja.
+							Mereset seluruh pengaturan, daftar aplikasi, dan membuka kembali layar sambutan awal dari nol.
 						</Text>
 					</View>
 					<RotateCcw size={20} color="#f43f5e" />
@@ -305,7 +330,6 @@ export const SettingsMainTab: React.FC = () => {
 					{
 						id: "shizuku",
 						label: "Shizuku",
-						badge: "REKOMENDASI",
 						badgeType: "emerald",
 						description:
 							"Akses nirkabel berkecepatan tinggi via ADB tanpa perlu root. Sangat stabil dan aman.",
@@ -313,7 +337,6 @@ export const SettingsMainTab: React.FC = () => {
 					{
 						id: "root",
 						label: "Root Akses",
-						badge: "SUPERUSER",
 						badgeType: "amber",
 						description:
 							"Eksekusi langsung ke kernel sistem daya tinggi. Membutuhkan perizinan Magisk atau KernelSU.",
@@ -363,6 +386,13 @@ export const SettingsMainTab: React.FC = () => {
 				title="Informasi Mode Root"
 				content="Pastikan perangkat Anda sudah di-root menggunakan Magisk atau KernelSU. Berikan izin Superuser (Grant) saat diminta oleh pop-up sistem agar fitur eksekusi cepat ini bekerja optimal tanpa hambatan."
 				onClose={() => setRootInfoModal(false)}
+			/>
+
+			<InfoModal
+				visible={batteryModal}
+				title="Sudah Diizinkan"
+				content="Aplikasi KillApps saat ini sudah diizinkan oleh sistem Android berjalan tanpa batasan baterai."
+				onClose={() => setBatteryModal(false)}
 			/>
 		</View>
 	);

@@ -12,14 +12,16 @@ export const AboutModal: React.FC = () => {
 	return (
 		<Modal
 			visible={currentScreen === "about"}
-			animationType="fade"
+			animationType="slide"
 			transparent={true}
 			onRequestClose={() => setCurrentScreen("home")}
 		>
-			<View className="flex-1 bg-black/80 justify-center items-center p-6">
+			<View className="flex-1 bg-black/80 justify-end">
+				<Pressable className="flex-1" onPress={() => setCurrentScreen("home")} />
 				<View
-					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-3xl p-6 w-full max-w-sm items-center`}
+					className={`${colors.modalBgClass} border-t ${colors.borderClass} rounded-t-3xl p-6 pb-8 items-center`}
 				>
+					<View className="w-12 h-1.5 bg-zinc-500/30 rounded-full mb-6" />
 					<View
 						className={`w-16 h-16 rounded-2xl ${colors.secondaryBtnClass} border ${colors.borderClass} items-center justify-center mb-4`}
 					>

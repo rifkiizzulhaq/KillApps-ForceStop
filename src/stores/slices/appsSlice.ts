@@ -81,8 +81,15 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			if (!silent) {
 				set({ isLoading: true });
 			}
-			const apps = await killerService.getInstalledApps();
-			apps.sort((a, b) => a.appName.localeCompare(b.appName));
+			const fetchedApps = await killerService.getInstalledApps();
+			fetchedApps.sort((a, b) => a.appName.localeCompare(b.appName));
+			const currentSelected = new Set(
+				get().apps.filter((a) => a.isSelected).map((a) => a.packageName),
+			);
+			const apps = fetchedApps.map((app) => ({
+				...app,
+				isSelected: currentSelected.has(app.packageName),
+			}));
 			set({ apps });
 		} catch {
 			set({ apps: [] });

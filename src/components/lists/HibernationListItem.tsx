@@ -1,4 +1,4 @@
-import { X } from "lucide-react-native";
+import { X, Zap } from "lucide-react-native";
 import type React from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
@@ -7,21 +7,27 @@ import type { AppInfo } from "../../types/app";
 interface Props {
 	app: AppInfo;
 	onRemove: (packageName: string) => void;
+	onKill?: (packageName: string) => void;
 	disabled?: boolean;
 }
 
 export const HibernationListItem: React.FC<Props> = ({
 	app,
 	onRemove,
+	onKill,
 	disabled,
 }) => {
 	const { colors, isDark } = useTheme();
 
 	return (
 		<View
-			className={`flex-row items-center justify-between p-4 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-2.5`}
+			className={`flex-row items-center justify-between p-3.5 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-2.5`}
 		>
-			<View className="flex-row items-center flex-1 pr-3">
+			<Pressable
+				onPress={() => !disabled && !app.isStopped && onKill?.(app.packageName)}
+				disabled={disabled || app.isStopped}
+				className="flex-row items-center flex-1 pr-2 active:opacity-75"
+			>
 				{app.icon ? (
 					<Image
 						source={{ uri: app.icon }}
@@ -81,15 +87,32 @@ export const HibernationListItem: React.FC<Props> = ({
 						{app.packageName}
 					</Text>
 				</View>
-			</View>
-
-			<Pressable
-				onPress={() => !disabled && onRemove(app.packageName)}
-				disabled={disabled}
-				className={`w-8 h-8 rounded-full ${colors.secondaryBtnClass} items-center justify-center transition-all ${disabled ? "opacity-30" : "active:opacity-70"}`}
-			>
-				<X size={16} color={colors.iconColor} />
 			</Pressable>
+
+			<View className="flex-row items-center gap-1.5">
+				{!app.isStopped && onKill && (
+					<Pressable
+						onPress={() => !disabled && onKill(app.packageName)}
+						disabled={disabled}
+						className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${colors.primaryBtnClass} active:opacity-80`}
+					>
+						<Zap size={13} color={colors.primaryBtnTextClass.includes("white") ? "#fff" : isDark ? "#000" : "#fff"} />
+						<Text
+							className={`font-black text-[10px] tracking-wider uppercase ${colors.primaryBtnTextClass}`}
+						>
+							Kill
+						</Text>
+					</Pressable>
+				)}
+
+				<Pressable
+					onPress={() => !disabled && onRemove(app.packageName)}
+					disabled={disabled}
+					className={`w-8 h-8 rounded-full ${colors.secondaryBtnClass} items-center justify-center transition-all ${disabled ? "opacity-30" : "active:opacity-70"}`}
+				>
+					<X size={16} color={colors.iconColor} />
+				</Pressable>
+			</View>
 		</View>
 	);
 };

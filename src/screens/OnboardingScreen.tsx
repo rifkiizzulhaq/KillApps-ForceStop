@@ -10,6 +10,7 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
+	Alert,
 	PermissionsAndroid,
 	Platform,
 	Pressable,
@@ -18,10 +19,6 @@ import {
 	View,
 } from "react-native";
 import { useTheme } from "../hooks/useTheme";
-import {
-	checkBatteryOptimization,
-	requestBatteryOptimization,
-} from "../services/killerService";
 import { useAppStore } from "../stores/useAppStore";
 
 export const OnboardingScreen: React.FC = () => {
@@ -29,7 +26,6 @@ export const OnboardingScreen: React.FC = () => {
 	const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
 	const [notifGranted, setNotifGranted] = useState<boolean>(false);
-	const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
 
 	const settings = useAppStore((state) => state.settings);
 	const updateSetting = useAppStore((state) => state.updateSetting);
@@ -81,15 +77,8 @@ export const OnboardingScreen: React.FC = () => {
 			} else {
 				setNotifGranted(true);
 			}
-			if (sdkLevel >= 23) {
-				const ignored = await checkBatteryOptimization();
-				setBatteryIgnored(ignored);
-			} else {
-				setBatteryIgnored(true);
-			}
 		} else {
 			setNotifGranted(true);
-			setBatteryIgnored(true);
 		}
 	}, [sdkLevel]);
 
@@ -118,7 +107,7 @@ export const OnboardingScreen: React.FC = () => {
 		}
 	}, [step, startVerification]);
 
-	const allPermsGranted = batteryIgnored && notifGranted;
+	const allPermsGranted = notifGranted;
 
 	let permCounter = 1;
 
@@ -207,61 +196,34 @@ export const OnboardingScreen: React.FC = () => {
 						</Text>
 
 						<View className="gap-3">
-							{sdkLevel >= 23 && (
+							<View
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+							>
+								<Text
+									className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
+								>
+									{permCounter++}. Akses Daftar Semua Aplikasi
+								</Text>
 								<View
-									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+									className={`px-2.5 py-1 rounded border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300"}`}
 								>
 									<Text
-										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
+										className={`text-[10px] font-black uppercase ${colors.textClass}`}
 									>
-										{permCounter++}. Abaikan Optimasi Baterai
+										OTOMATIS AKTIF
 									</Text>
-									<Pressable
-										onPress={async () => {
-											await requestBatteryOptimization();
-											setTimeout(checkSystemPermissions, 1000);
-										}}
-										className={`px-3 py-1.5 rounded border ${batteryIgnored ? (isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300") : colors.primaryBtnClass}`}
-									>
-										<Text
-											className={`text-[10px] font-black uppercase ${batteryIgnored ? colors.textClass : colors.primaryBtnTextClass}`}
-										>
-											{batteryIgnored ? "DIZINKAN" : "MINTA IZIN"}
-										</Text>
-									</Pressable>
 								</View>
-							)}
+							</View>
 
-							{sdkLevel >= 30 && (
-								<View
-									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+							<View
+								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
+							>
+								<Text
+									className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
 								>
-									<Text
-										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
-									>
-										{permCounter++}. Akses Daftar Semua Aplikasi
-									</Text>
-									<View
-										className={`px-2.5 py-1 rounded border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300"}`}
-									>
-										<Text
-											className={`text-[10px] font-black uppercase ${colors.textClass}`}
-										>
-											OTOMATIS AKTIF
-										</Text>
-									</View>
-								</View>
-							)}
-
-							{sdkLevel >= 33 && (
-								<View
-									className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-center justify-between`}
-								>
-									<Text
-										className={`${colors.textClass} font-bold text-sm flex-1 mr-2`}
-									>
-										{permCounter++}. Izin Notifikasi Sistem
-									</Text>
+									{permCounter++}. Izin Notifikasi Sistem
+								</Text>
+								{sdkLevel >= 33 ? (
 									<Pressable
 										onPress={async () => {
 											if (Platform.OS === "android") {
@@ -279,27 +241,18 @@ export const OnboardingScreen: React.FC = () => {
 											{notifGranted ? "DIZINKAN" : "MINTA IZIN"}
 										</Text>
 									</Pressable>
-								</View>
-							)}
-
-							{sdkLevel < 23 && (
-								<View
-									className={`${colors.cardClass} border ${colors.cardBorderClass} p-6 rounded-2xl items-center`}
-								>
-									<Check size={36} color={colors.iconColor} />
-									<Text
-										className={`${colors.textClass} font-bold text-sm mt-3 text-center`}
+								) : (
+									<View
+										className={`px-2.5 py-1 rounded border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-zinc-200 border-zinc-300"}`}
 									>
-										Tidak Ada Izin Aplikasi Tambahan
-									</Text>
-									<Text
-										className={`${colors.subTextClass} text-xs mt-1 text-center`}
-									>
-										Versi Android Anda siap menjalankan KillApps secara
-										langsung.
-									</Text>
-								</View>
-							)}
+										<Text
+											className={`text-[10px] font-black uppercase ${colors.textClass}`}
+										>
+											OTOMATIS AKTIF
+										</Text>
+									</View>
+								)}
+							</View>
 						</View>
 					</View>
 				)}
@@ -467,19 +420,30 @@ export const OnboardingScreen: React.FC = () => {
 					</Pressable>
 				) : (
 					<Pressable
-						onPress={completeOnboarding}
-						disabled={!isModeVerified || isVerifying}
-						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all ${
+						onPress={() => {
+							if (!isModeVerified) {
+								Alert.alert(
+									"Layanan Belum Aktif",
+									"Silakan izinkan atau aktifkan mode Shizuku/Root terlebih dahulu agar aplikasi dapat bekerja."
+								);
+							} else {
+								completeOnboarding();
+							}
+						}}
+						disabled={isVerifying}
+						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all border ${
 							isModeVerified && !isVerifying
-								? `${colors.primaryBtnClass} active:opacity-80`
-								: `${colors.cardClass} opacity-50`
+								? `${colors.primaryBtnClass} border-transparent active:opacity-80`
+								: isDark
+									? "bg-zinc-800 border-zinc-700 active:opacity-80"
+									: "bg-zinc-200 border-zinc-300 active:opacity-80"
 						}`}
 					>
 						<Text
 							className={`font-black text-sm ${
 								isModeVerified && !isVerifying
 									? colors.primaryBtnTextClass
-									: colors.subTextClass
+									: colors.textClass
 							}`}
 						>
 							Masuk ke Aplikasi Utama

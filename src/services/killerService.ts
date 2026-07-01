@@ -140,6 +140,9 @@ let currentMode: KillerMode = "shizuku";
 
 export const setKillerMode = (mode: KillerMode): void => {
 	currentMode = mode;
+	if (Platform.OS === "android" && ShizukuKillerModule && ShizukuKillerModule.setWorkingMode) {
+		ShizukuKillerModule.setWorkingMode(mode);
+	}
 };
 
 export const getKillerService = (

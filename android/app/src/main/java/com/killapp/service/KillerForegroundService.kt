@@ -32,7 +32,16 @@ class KillerForegroundService : Service() {
             override fun run() {
                 val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
                 val enabled = prefs.getBoolean("quickActionNotifEnabled", ShizukuKillerModule.quickActionNotifEnabled)
-                if (enabled) {
+                val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
+                val isModeAlive = if (mode == "root") {
+                    prefs.getBoolean("isRootActive", false)
+                } else {
+                    try {
+                        rikka.shizuku.Shizuku.pingBinder() && rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    } catch (e: Exception) { false }
+                }
+
+                if (enabled && isModeAlive) {
                     val targets = prefs.getStringSet("autoHibernationTargets", ShizukuKillerModule.autoHibernationTargets) ?: setOf()
                     val postponed = prefs.getStringSet("postponedPackages", ShizukuKillerModule.postponedPackages) ?: setOf()
                     helper.updateDisplay(
@@ -43,6 +52,7 @@ class KillerForegroundService : Service() {
                     )
                     handler?.postDelayed(this, 2000)
                 } else {
+                    helper.updateDisplay(false, setOf(), setOf(), true)
                     stopSelf()
                 }
             }

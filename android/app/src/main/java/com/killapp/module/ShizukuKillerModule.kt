@@ -71,6 +71,12 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     @ReactMethod
+    fun setWorkingMode(mode: String) {
+        val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("workingMode", mode).apply()
+    }
+
+    @ReactMethod
     fun checkBinder(promise: Promise) {
         try {
             val isBinderAlive = Shizuku.pingBinder()
@@ -126,12 +132,13 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             try {
                 val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
                 val exitCode = process.waitFor()
-                if (exitCode == 0) {
-                    promise.resolve(true)
-                } else {
-                    promise.resolve(false)
-                }
+                val isRoot = (exitCode == 0)
+                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("isRootActive", isRoot).apply()
+                promise.resolve(isRoot)
             } catch (e: Exception) {
+                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("isRootActive", false).apply()
                 promise.resolve(false)
             }
         }.start()
@@ -476,14 +483,6 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             } else {
                 reactApplicationContext.startService(serviceIntent)
             }
-			pollingHandler?.post(object : Runnable {
-				override fun run() {
-					if (quickActionNotifEnabled) {
-						updateNotificationDisplay(false)
-						pollingHandler?.postDelayed(this, 2000)
-					}
-				}
-			})
         } else {
             reactApplicationContext.stopService(serviceIntent)
         }

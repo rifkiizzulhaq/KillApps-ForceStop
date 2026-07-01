@@ -22,8 +22,9 @@ export const createShizukuSlice: StateCreator<
 			isPermissionGranted: isPerm,
 			isRootActive: isRoot,
 		});
-		const silent = get().apps.length > 0;
-		await get().fetchApps(silent);
+		if (get().apps.length === 0) {
+			await get().fetchApps(false);
+		}
 	},
 
 	requestShizukuPermission: async () => {

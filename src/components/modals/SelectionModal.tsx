@@ -49,13 +49,15 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
 		<Modal
 			visible={visible}
 			transparent={true}
-			animationType="fade"
+			animationType="slide"
 			onRequestClose={onClose}
 		>
-			<View className="flex-1 bg-black/80 justify-center items-center px-5">
+			<View className="flex-1 bg-black/80 justify-end">
+				<Pressable className="flex-1" onPress={onClose} />
 				<View
-					className={`w-full ${colors.modalBgClass} border ${colors.borderClass} rounded-3xl p-6 shadow-2xl max-h-[85%]`}
+					className={`w-full ${colors.modalBgClass} border-t ${colors.borderClass} rounded-t-3xl p-6 pb-8 shadow-2xl max-h-[88%]`}
 				>
+					<View className="w-12 h-1.5 bg-zinc-500/30 rounded-full self-center mb-5" />
 					<View className="flex-row items-start justify-between mb-5">
 						<View className="flex-1 pr-3">
 							<View className="flex-row items-center gap-2 mb-1">
