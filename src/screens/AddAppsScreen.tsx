@@ -113,6 +113,7 @@ export const AddAppsScreen: React.FC = () => {
 			>
 				<View className="flex-row items-center gap-4">
 					<Pressable
+						testID="btn-back"
 						onPress={() => setCurrentScreen("home")}
 						className={`w-10 h-10 items-center justify-center rounded-full ${colors.secondaryBtnClass}`}
 					>
@@ -167,6 +168,7 @@ export const AddAppsScreen: React.FC = () => {
 				>
 					<Search size={18} color={colors.subIconColor} />
 					<TextInput
+						testID="search-input"
 						placeholder="Cari aplikasi untuk ditambahkan..."
 						placeholderTextColor={isDark ? "#71717a" : "#a1a1aa"}
 						value={searchQuery}
@@ -174,7 +176,11 @@ export const AddAppsScreen: React.FC = () => {
 						className={`flex-1 ${colors.textClass} text-sm ml-2.5 p-0 font-medium`}
 					/>
 					{searchQuery.length > 0 && (
-						<Pressable onPress={() => setSearchQuery("")} className="p-1">
+						<Pressable
+							testID="btn-clear-search"
+							onPress={() => setSearchQuery("")}
+							className="p-1"
+						>
 							<X size={16} color={colors.subIconColor} />
 						</Pressable>
 					)}
@@ -183,7 +189,11 @@ export const AddAppsScreen: React.FC = () => {
 
 			{isLoading || isSearching ? (
 				<View className="flex-1 items-center justify-center">
-					<ActivityIndicator size="large" color={colors.iconColor} />
+					<ActivityIndicator
+						testID="loading-spinner"
+						size="large"
+						color={colors.iconColor}
+					/>
 					<Text className={`${colors.subTextClass} mt-3 text-sm`}>
 						{isLoading
 							? "Memindai aplikasi di latar belakang..."
@@ -197,6 +207,7 @@ export const AddAppsScreen: React.FC = () => {
 					style={{ opacity: isModeVerified ? 1 : 0.4 }}
 				>
 					<SectionList
+						testID="app-section-list"
 						sections={sections}
 						decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
 						keyExtractor={(item) => item.packageName}
@@ -206,6 +217,7 @@ export const AddAppsScreen: React.FC = () => {
 								className={`flex-row items-center justify-between mb-3 mt-4 px-1 ${colors.bgClass}`}
 							>
 								<Text
+									testID="section-header-text"
 									className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
 								>
 									{section.title}
@@ -217,7 +229,10 @@ export const AddAppsScreen: React.FC = () => {
 								<View
 									className={`p-4 ${colors.cardClass} rounded-xl border ${colors.cardBorderClass} items-center mb-6`}
 								>
-									<Text className={`${colors.captionClass} text-xs`}>
+									<Text
+										testID="section-empty-text"
+										className={`${colors.captionClass} text-xs`}
+									>
 										{section.emptyText}
 									</Text>
 								</View>
@@ -239,6 +254,7 @@ export const AddAppsScreen: React.FC = () => {
 
 			{selectedCount > 0 && (
 				<Pressable
+					testID="fab-add-selected"
 					onPress={() => isModeVerified && addSelectedToHibernation()}
 					disabled={!isModeVerified}
 					style={{ elevation: 10 }}

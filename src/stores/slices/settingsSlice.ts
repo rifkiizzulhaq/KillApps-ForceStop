@@ -4,6 +4,7 @@ import {
 	setGeekOptions,
 	setHibernationOptions,
 	setKillerMode,
+	setProOptions,
 } from "../../services/killerService";
 import type { KillerMode } from "../../types/app";
 import type { AppState, SettingsSlice } from "../../types/store";
@@ -34,6 +35,11 @@ export const createSettingsSlice: StateCreator<
 		aggressiveDoze: false,
 		gcmWakeupBypass: true,
 		deepTrimMemory: false,
+		phantomSlayer: false,
+		bedtimeShield: false,
+		emergencyTrigger: false,
+		ramCrunchSlayer: false,
+		autoKillScheduler: 0,
 	},
 
 	setCurrentScreen: (screen) => {
@@ -65,6 +71,13 @@ export const createSettingsSlice: StateCreator<
 				newSettings.wakeUpTracking ?? true,
 				newSettings.dontRemoveNotif ?? false,
 			);
+			setProOptions({
+				phantomSlayer: newSettings.phantomSlayer ?? false,
+				bedtimeShield: newSettings.bedtimeShield ?? false,
+				emergencyTrigger: newSettings.emergencyTrigger ?? false,
+				ramCrunchSlayer: newSettings.ramCrunchSlayer ?? false,
+				autoKillScheduler: newSettings.autoKillScheduler ?? 0,
+			});
 			return updates;
 		});
 	},
@@ -94,6 +107,13 @@ export const createSettingsSlice: StateCreator<
 					state.settings?.wakeUpTracking ?? true,
 					state.settings?.dontRemoveNotif ?? false,
 				);
+				setProOptions({
+					phantomSlayer: state.settings?.phantomSlayer ?? false,
+					bedtimeShield: state.settings?.bedtimeShield ?? false,
+					emergencyTrigger: state.settings?.emergencyTrigger ?? false,
+					ramCrunchSlayer: state.settings?.ramCrunchSlayer ?? false,
+					autoKillScheduler: state.settings?.autoKillScheduler ?? 0,
+				});
 			}
 			return { isHydrated: stateVal };
 		});
@@ -125,6 +145,11 @@ export const createSettingsSlice: StateCreator<
 				aggressiveDoze: false,
 				gcmWakeupBypass: true,
 				deepTrimMemory: false,
+				phantomSlayer: false,
+				bedtimeShield: false,
+				emergencyTrigger: false,
+				ramCrunchSlayer: false,
+				autoKillScheduler: 0,
 			},
 		}));
 	},

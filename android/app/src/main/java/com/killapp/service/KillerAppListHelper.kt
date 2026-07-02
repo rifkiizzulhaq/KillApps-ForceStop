@@ -26,7 +26,8 @@ object KillerAppListHelper {
                 val appName = packageManager.getApplicationLabel(app).toString()
                 val isSystemApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 val isGcm = packageManager.checkPermission("com.google.android.c2dm.permission.RECEIVE", packageName) == PackageManager.PERMISSION_GRANTED
-                val isStopped = (app.flags and ApplicationInfo.FLAG_STOPPED) != 0
+                val isStoppedFlag = (app.flags and ApplicationInfo.FLAG_STOPPED) != 0
+                val isStopped = isStoppedFlag || isAppInactiveOrShallow(context, packageName)
 
                 val iconBase64 = AppIconHelper.getAppIconBase64(packageManager, app, packageName, iconCache)
 
@@ -50,5 +51,30 @@ object KillerAppListHelper {
         }
         executor.shutdown()
         return result
+    }
+
+    fun isAppInactiveOrShallow(context: Context, packageName: String): Boolean {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val processes = am?.runningAppProcesses
+            if (processes != null) {
+                for (proc in processes) {
+                    if (proc.pkgList != null && proc.pkgList.contains(packageName)) {
+                        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                        val shallowSet = prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()
+                        if (shallowSet.contains(packageName)) {
+                            val editSet = shallowSet.toMutableSet()
+                            editSet.remove(packageName)
+                            prefs.edit().putStringSet("shallow_killed_set", editSet).apply()
+                        }
+                        return false
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        val shallowSet = prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()
+        return shallowSet.contains(packageName)
     }
 }

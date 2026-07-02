@@ -6,6 +6,8 @@ import { useTheme } from "./src/hooks/useTheme";
 import { AddAppsScreen } from "./src/screens/AddAppsScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
+import { ProAnalyticsScreen } from "./src/screens/ProAnalyticsScreen";
+import { QuarantineScreen } from "./src/screens/QuarantineScreen";
 import { useAppStore } from "./src/stores/useAppStore";
 
 function App(): React.JSX.Element | null {
@@ -61,6 +63,10 @@ function App(): React.JSX.Element | null {
 				<OnboardingScreen />
 			) : currentScreen === "add_apps" ? (
 				<AddAppsScreen />
+			) : currentScreen === "quarantine" ? (
+				<QuarantineScreen />
+			) : currentScreen === "pro_analytics" ? (
+				<ProAnalyticsScreen />
 			) : (
 				<HomeScreen />
 			)}

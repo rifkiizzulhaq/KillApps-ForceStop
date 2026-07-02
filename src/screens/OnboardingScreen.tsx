@@ -110,6 +110,7 @@ export const OnboardingScreen: React.FC = () => {
 	}, [step, startVerification]);
 
 	const allPermsGranted = notifGranted;
+	const isNextActive = step !== 2 || allPermsGranted;
 
 	let permCounter = 1;
 
@@ -165,52 +166,79 @@ export const OnboardingScreen: React.FC = () => {
 						<Text className={`${colors.textClass} text-2xl font-black mb-1.5`}>
 							Selamat Datang di KillApps
 						</Text>
-						<Text className={`${colors.subTextClass} text-xs leading-relaxed mb-6`}>
-							Aplikasi pembersih latar belakang tingkat lanjut untuk menjaga ponsel Anda tetap cepat, hemat baterai, dan bebas lemot.
+						<Text
+							className={`${colors.subTextClass} text-xs leading-relaxed mb-6`}
+						>
+							Aplikasi pembersih latar belakang tingkat lanjut untuk menjaga
+							ponsel Anda tetap cepat, hemat baterai, dan bebas lemot.
 						</Text>
 						<View className="w-full gap-3.5">
 							<View
 								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
 							>
-								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+								<View
+									className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}
+								>
 									<Settings size={20} color={colors.iconColor} />
 								</View>
 								<View className="flex-1">
-									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+									<Text
+										className={`${colors.textClass} font-bold text-sm mb-1`}
+									>
 										Penghentian Aplikasi Latar Belakang
 									</Text>
-									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
-										Menutup paksa atau membekukan aplikasi yang diam-diam berjalan di latar belakang hanya dengan 1 ketukan tanpa membuat ponsel lag.
+									<Text
+										className={`${colors.subTextClass} text-[11px] leading-relaxed`}
+									>
+										Menutup paksa atau membekukan aplikasi yang diam-diam
+										berjalan di latar belakang hanya dengan 1 ketukan tanpa
+										membuat ponsel lag.
 									</Text>
 								</View>
 							</View>
 							<View
 								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
 							>
-								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+								<View
+									className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}
+								>
 									<Shield size={20} color={colors.iconColor} />
 								</View>
 								<View className="flex-1">
-									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+									<Text
+										className={`${colors.textClass} font-bold text-sm mb-1`}
+									>
 										Penghematan RAM & Baterai Maksimal
 									</Text>
-									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
-										Menyapu bersih sisa memori cache dan memotong sinyal pemicu kebangkitan aplikasi, sehingga baterai awet dan RAM melonjak lega.
+									<Text
+										className={`${colors.subTextClass} text-[11px] leading-relaxed`}
+									>
+										Menyapu bersih sisa memori cache dan memotong sinyal pemicu
+										kebangkitan aplikasi, sehingga baterai awet dan RAM melonjak
+										lega.
 									</Text>
 								</View>
 							</View>
 							<View
 								className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row items-start gap-3.5`}
 							>
-								<View className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+								<View
+									className={`p-2.5 rounded-xl ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}
+								>
 									<Zap size={20} color={colors.iconColor} />
 								</View>
 								<View className="flex-1">
-									<Text className={`${colors.textClass} font-bold text-sm mb-1`}>
+									<Text
+										className={`${colors.textClass} font-bold text-sm mb-1`}
+									>
 										Otomatisasi & Perlindungan Pintar
 									</Text>
-									<Text className={`${colors.subTextClass} text-[11px] leading-relaxed`}>
-										Membersihkan otomatis saat layar ponsel dimatikan serta melindungi pemutaran musik dan navigasi GPS agar tidak terganggu.
+									<Text
+										className={`${colors.subTextClass} text-[11px] leading-relaxed`}
+									>
+										Membersihkan otomatis saat layar ponsel dimatikan serta
+										melindungi pemutaran musik dan navigasi GPS agar tidak
+										terganggu.
 									</Text>
 								</View>
 							</View>
@@ -435,18 +463,18 @@ export const OnboardingScreen: React.FC = () => {
 				{step < 3 ? (
 					<Pressable
 						onPress={() => setStep(step + 1)}
-						disabled={step === 2 && !allPermsGranted}
-						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all ${
-							step !== 2 || allPermsGranted
+						disabled={!isNextActive}
+						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 border border-transparent ${
+							isNextActive
 								? `${colors.primaryBtnClass} active:opacity-80`
 								: isDark
-									? "bg-zinc-800 border border-zinc-700 opacity-80"
-									: "bg-zinc-200 border border-zinc-300 opacity-80"
+									? "bg-zinc-800 border-zinc-700 opacity-50"
+									: "bg-zinc-200 border-zinc-300 opacity-50"
 						}`}
 					>
 						<Text
 							className={`font-black text-sm ${
-								step !== 2 || allPermsGranted
+								isNextActive
 									? colors.primaryBtnTextClass
 									: isDark
 										? "text-zinc-400"
@@ -469,7 +497,7 @@ export const OnboardingScreen: React.FC = () => {
 							}
 						}}
 						disabled={isVerifying}
-						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 transition-all border ${
+						className={`px-6 py-3.5 rounded-xl flex-row items-center gap-2 border ${
 							isModeVerified && !isVerifying
 								? `${colors.primaryBtnClass} border-transparent active:opacity-80`
 								: isDark
@@ -484,7 +512,7 @@ export const OnboardingScreen: React.FC = () => {
 									: colors.textClass
 							}`}
 						>
-							Masuk ke Aplikasi Utama
+							Masuk ke Aplikasi
 						</Text>
 						{isModeVerified && !isVerifying && (
 							<Check size={18} color={isDark ? "#000" : "#fff"} />

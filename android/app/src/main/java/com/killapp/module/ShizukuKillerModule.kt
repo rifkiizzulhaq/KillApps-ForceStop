@@ -25,6 +25,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableMap
+import com.killapp.service.KillerForensicHelper
 import rikka.shizuku.Shizuku
 
 class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), Shizuku.OnRequestPermissionResultListener {
@@ -398,6 +400,71 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             reactApplicationContext.stopService(serviceIntent)
         }
         updateNotificationDisplay(true)
+    }
+
+    @ReactMethod
+    fun freezeQuarantinePackage(pkg: String, freeze: Boolean, promise: Promise) {
+        Thread {
+            try {
+                val cmd = if (freeze) "pm disable-user --user 0 $pkg" else "pm enable $pkg"
+                val res = ShizukuCommandHelper.executeCommand(cmd)
+                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                val set = (prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()).toMutableSet()
+                if (freeze) set.add(pkg) else set.remove(pkg)
+                prefs.edit().putStringSet("quarantinePackages", set).apply()
+                promise.resolve(res == 0)
+            } catch (e: Exception) {
+                promise.reject("FREEZE_ERR", e.message)
+            }
+        }.start()
+    }
+
+    @ReactMethod
+    fun getImpactAnalytics(promise: Promise) {
+        try {
+            val map = KillerForensicHelper.getImpactAnalytics(reactApplicationContext)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            promise.reject("ANALYTICS_ERR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getResurrectionDetectiveReport(promise: Promise) {
+        try {
+            val arr = KillerForensicHelper.getResurrectionReport(reactApplicationContext)
+            promise.resolve(arr)
+        } catch (e: Exception) {
+            promise.reject("FORENSIC_ERR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setProOptions(options: ReadableMap) {
+        val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        val edit = prefs.edit()
+        if (options.hasKey("phantomSlayer")) edit.putBoolean("phantomSlayer", options.getBoolean("phantomSlayer"))
+        if (options.hasKey("bedtimeShield")) edit.putBoolean("bedtimeShield", options.getBoolean("bedtimeShield"))
+        if (options.hasKey("emergencyTrigger")) edit.putBoolean("emergencyTrigger", options.getBoolean("emergencyTrigger"))
+        if (options.hasKey("ramCrunchSlayer")) edit.putBoolean("ramCrunchSlayer", options.getBoolean("ramCrunchSlayer"))
+        if (options.hasKey("autoKillScheduler")) edit.putInt("autoKillScheduler", options.getInt("autoKillScheduler"))
+        edit.apply()
+
+        val isAnyActive = prefs.getBoolean("quickActionNotifEnabled", quickActionNotifEnabled) ||
+                prefs.getBoolean("bedtimeShield", false) ||
+                prefs.getBoolean("emergencyTrigger", false) ||
+                prefs.getBoolean("ramCrunchSlayer", false) ||
+                prefs.getInt("autoKillScheduler", 0) > 0
+        val serviceIntent = Intent(reactApplicationContext, KillerForegroundService::class.java)
+        if (isAnyActive) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try { reactApplicationContext.startForegroundService(serviceIntent) } catch (e: Exception) { reactApplicationContext.startService(serviceIntent) }
+            } else {
+                reactApplicationContext.startService(serviceIntent)
+            }
+        } else {
+            reactApplicationContext.stopService(serviceIntent)
+        }
     }
 
     private fun updateNotificationDisplay(force: Boolean = true) {

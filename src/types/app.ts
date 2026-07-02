@@ -31,4 +31,23 @@ export interface AppSettings {
 	aggressiveDoze?: boolean;
 	gcmWakeupBypass?: boolean;
 	deepTrimMemory?: boolean;
+	phantomSlayer?: boolean;
+	bedtimeShield?: boolean;
+	emergencyTrigger?: boolean;
+	ramCrunchSlayer?: boolean;
+	autoKillScheduler?: number;
+}
+
+export interface ImpactAnalytics {
+	totalKilledCount: number;
+	blockedWakeupsCount: number;
+	totalRamSavedMb: number;
+	availMemGb: number;
+	totalMemGb: number;
+}
+
+export interface ResurrectionItem {
+	packageName: string;
+	appName: string;
+	restartCount: number;
 }

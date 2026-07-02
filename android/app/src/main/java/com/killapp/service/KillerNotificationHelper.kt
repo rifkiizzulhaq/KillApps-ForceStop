@@ -91,8 +91,15 @@ class KillerNotificationHelper(private val context: Context) {
             }
 
             val pm = context.packageManager
+            val finerMedia = prefs.getBoolean("finerMediaDetection", false)
+            val smart = prefs.getBoolean("smartHibernation", true)
+            val activeMediaPkgs = if (finerMedia) KillerExecutionHelper.getActiveMediaPackages() else setOf()
+
             val activeTargets = autoHibernationTargets.filter { pkg ->
                 if (postponedPackages.contains(pkg)) return@filter false
+                if (KillerAppListHelper.isAppInactiveOrShallow(context, pkg)) return@filter false
+                if (KillerExecutionHelper.isMediaActiveProtected(context, pkg, finerMedia, activeMediaPkgs)) return@filter false
+                if (KillerExecutionHelper.isSmartProtected(context, pkg, smart)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
                     (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
@@ -103,6 +110,7 @@ class KillerNotificationHelper(private val context: Context) {
 
             val postponedRunning = autoHibernationTargets.filter { pkg ->
                 if (!postponedPackages.contains(pkg)) return@filter false
+                if (KillerAppListHelper.isAppInactiveOrShallow(context, pkg)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
                     (info.flags and ApplicationInfo.FLAG_STOPPED) == 0

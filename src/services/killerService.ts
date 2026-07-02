@@ -222,3 +222,42 @@ export const requestBatteryOptimization = async (): Promise<boolean> => {
 	if (Platform.OS !== "android" || !ShizukuKillerModule) return true;
 	return await ShizukuKillerModule.requestIgnoreBatteryOptimizations();
 };
+
+export const setProOptions = (options: {
+	phantomSlayer?: boolean;
+	bedtimeShield?: boolean;
+	emergencyTrigger?: boolean;
+	ramCrunchSlayer?: boolean;
+	autoKillScheduler?: number;
+}): void => {
+	if (Platform.OS === "android" && ShizukuKillerModule?.setProOptions) {
+		ShizukuKillerModule.setProOptions(options);
+	}
+};
+
+export const freezeQuarantinePackage = async (
+	pkg: string,
+	freeze: boolean,
+): Promise<boolean> => {
+	if (
+		Platform.OS !== "android" ||
+		!ShizukuKillerModule?.freezeQuarantinePackage
+	)
+		return false;
+	return await ShizukuKillerModule.freezeQuarantinePackage(pkg, freeze);
+};
+
+export const getImpactAnalytics = async () => {
+	if (Platform.OS !== "android" || !ShizukuKillerModule?.getImpactAnalytics)
+		return null;
+	return await ShizukuKillerModule.getImpactAnalytics();
+};
+
+export const getResurrectionDetectiveReport = async () => {
+	if (
+		Platform.OS !== "android" ||
+		!ShizukuKillerModule?.getResurrectionDetectiveReport
+	)
+		return [];
+	return await ShizukuKillerModule.getResurrectionDetectiveReport();
+};

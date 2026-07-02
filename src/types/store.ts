@@ -1,6 +1,12 @@
 import type { AppInfo, AppSettings } from "./app";
 
-export type ScreenType = "home" | "add_apps" | "settings" | "about";
+export type ScreenType =
+	| "home"
+	| "add_apps"
+	| "settings"
+	| "about"
+	| "quarantine"
+	| "pro_analytics";
 
 export interface AppsSlice {
 	apps: AppInfo[];

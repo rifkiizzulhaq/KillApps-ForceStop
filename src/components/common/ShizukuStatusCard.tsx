@@ -45,6 +45,7 @@ export const ShizukuStatusCard: React.FC = () => {
 					</Text>
 				</View>
 				<Pressable
+					testID="btn-refresh"
 					onPress={handleRefresh}
 					accessibilityRole="button"
 					className={`px-3 py-1 ${colors.secondaryBtnClass} border ${colors.borderClass} rounded-lg active:opacity-70`}
@@ -57,7 +58,10 @@ export const ShizukuStatusCard: React.FC = () => {
 				</Pressable>
 			</View>
 
-			<Text className={`${colors.subTextClass} text-sm mb-4`}>
+			<Text
+				testID="status-text"
+				className={`${colors.subTextClass} text-sm mb-4`}
+			>
 				{isRoot
 					? !isRootActive
 						? "Akses Superuser (Root) tidak terdeteksi atau ditolak. Harap izinkan akses Root di Magisk/KernelSU."
@@ -71,6 +75,7 @@ export const ShizukuStatusCard: React.FC = () => {
 
 			{!isRoot && isShizukuActive && !isPermissionGranted && (
 				<Pressable
+					testID="btn-request-permission"
 					onPress={requestShizukuPermission}
 					disabled={isLoading}
 					accessibilityRole="button"

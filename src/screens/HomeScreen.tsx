@@ -202,11 +202,13 @@ export const HomeScreen: React.FC = () => {
 
 			{killMessage && (
 				<Pressable
+					testID="kill-message-pressable"
 					onPress={clearKillMessage}
 					className={`mx-4 mt-3 ${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row justify-between items-center`}
 				>
 					<View className="flex-1 mr-2">
 						<Text
+							testID="kill-message-text"
 							className={`${colors.textClass} text-xs font-semibold leading-5`}
 						>
 							{killMessage}
@@ -242,6 +244,7 @@ export const HomeScreen: React.FC = () => {
 				<View className="flex-1 items-center justify-center px-8">
 					<ActivityIndicator size="large" color={colors.iconColor} />
 					<Text
+						testID="loading-state-text"
 						className={`${colors.textClass} font-bold text-base mt-4 mb-1 text-center`}
 					>
 						Memuat Daftar KillApps...
@@ -258,6 +261,7 @@ export const HomeScreen: React.FC = () => {
 						<Layers size={40} color={colors.iconColor} />
 					</View>
 					<Text
+						testID="empty-state-text"
 						className={`${colors.textClass} font-bold text-xl mb-2 text-center`}
 					>
 						Selamat Datang di KillApps
@@ -278,6 +282,7 @@ export const HomeScreen: React.FC = () => {
 						>
 							<Search size={18} color={colors.subIconColor} />
 							<TextInput
+								testID="search-input"
 								placeholder="Cari di daftar KillApps..."
 								placeholderTextColor={isDark ? "#71717a" : "#a1a1aa"}
 								value={searchQuery}
@@ -310,6 +315,7 @@ export const HomeScreen: React.FC = () => {
 							<View className="items-center justify-center pt-16 px-6">
 								<Search size={36} color={colors.subIconColor} opacity={0.5} />
 								<Text
+									testID="not-found-text"
 									className={`${colors.textClass} font-bold text-base mt-4 mb-1 text-center`}
 								>
 									Aplikasi Tidak Ditemukan
@@ -328,6 +334,7 @@ export const HomeScreen: React.FC = () => {
 										<View className="flex-row items-center gap-2 mb-2.5 px-2">
 											<View className="w-2 h-2 rounded-full bg-emerald-500" />
 											<Text
+												testID="active-header"
 												className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
 											>
 												Sedang Aktif ({activeApps.length})
@@ -352,6 +359,7 @@ export const HomeScreen: React.FC = () => {
 										>
 											<View className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600" />
 											<Text
+												testID="hibernated-header"
 												className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
 											>
 												Sudah Di-kill / Tertidur ({hibernatedApps.length})
@@ -380,6 +388,7 @@ export const HomeScreen: React.FC = () => {
 					className="absolute bottom-6 left-6 right-24 z-50"
 				>
 					<Pressable
+						testID="fab-kill-all"
 						onPress={killHibernationApps}
 						disabled={!isModeVerified || isKilling || activeTargetsCount === 0}
 						className={`w-full h-14 px-4 rounded-2xl items-center justify-center flex-row gap-3 border transition-all ${
@@ -392,6 +401,7 @@ export const HomeScreen: React.FC = () => {
 					>
 						{isKilling && <ActivityIndicator color="#ffffff" size="small" />}
 						<Text
+							testID="fab-kill-text"
 							numberOfLines={1}
 							className={`font-black text-xs sm:text-sm tracking-wider ${
 								isModeVerified && activeTargetsCount > 0
@@ -408,6 +418,7 @@ export const HomeScreen: React.FC = () => {
 			)}
 
 			<Pressable
+				testID="fab-add"
 				onPress={() => {
 					if (!isModeVerified) return;
 					setCurrentScreen("add_apps");

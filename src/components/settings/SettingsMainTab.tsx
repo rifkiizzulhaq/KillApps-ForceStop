@@ -1,4 +1,10 @@
-import { AlertTriangle, ArrowRight, RotateCcw } from "lucide-react-native";
+import {
+	AlertTriangle,
+	ArrowRight,
+	RotateCcw,
+	Snowflake,
+	Sparkles,
+} from "lucide-react-native";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -22,6 +28,7 @@ export const SettingsMainTab: React.FC = () => {
 	const settings = useAppStore((state) => state.settings);
 	const updateSetting = useAppStore((state) => state.updateSetting);
 	const resetOnboarding = useAppStore((state) => state.resetOnboarding);
+	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
 	const isRootActive = useAppStore((state) => state.isRootActive);
 	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
 	const isPermissionGranted = useAppStore((state) => state.isPermissionGranted);
@@ -35,6 +42,7 @@ export const SettingsMainTab: React.FC = () => {
 	const [workingModeModal, setWorkingModeModal] = useState(false);
 	const [rootInfoModal, setRootInfoModal] = useState(false);
 	const [batteryModal, setBatteryModal] = useState(false);
+	const [autoKillModal, setAutoKillModal] = useState(false);
 
 	const handleQuickNotifChange = async (v: boolean) => {
 		if (v && Platform.OS === "android" && Number(Platform.Version) >= 33) {
@@ -78,6 +86,7 @@ export const SettingsMainTab: React.FC = () => {
 							(!settings?.themeMode && item.id === "system");
 						return (
 							<Pressable
+								testID={`btn-theme-${item.id}`}
 								key={item.id}
 								onPress={() => {
 									updateSetting(
@@ -127,6 +136,7 @@ export const SettingsMainTab: React.FC = () => {
 				2. Mode Eksekusi
 			</Text>
 			<Pressable
+				testID="btn-working-mode"
 				onPress={handleWorkingModePress}
 				className={`${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl mb-3 flex-row items-center justify-between active:opacity-70`}
 			>
@@ -152,6 +162,7 @@ export const SettingsMainTab: React.FC = () => {
 			</Pressable>
 
 			<View
+				testID="unverified-disabled-wrapper"
 				pointerEvents={isModeVerified ? "auto" : "none"}
 				style={{ opacity: isModeVerified ? 1 : 0.4 }}
 			>
@@ -226,6 +237,7 @@ export const SettingsMainTab: React.FC = () => {
 						onValueChange={(v) => updateSetting("hibernateSystemApps", v)}
 					/>
 					<Pressable
+						testID="battery-optimization-button"
 						onPress={async () => {
 							const ignored = await checkBatteryOptimization();
 							if (ignored) {
@@ -320,7 +332,112 @@ export const SettingsMainTab: React.FC = () => {
 			<Text
 				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
 			>
-				8. Sistem & Reset
+				8. KILLAPPS PRO SUITE (EKSKLUSIF)
+			</Text>
+			<View
+				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-4 p-4`}
+			>
+				<View className="flex-row items-center justify-between pb-3.5 border-b border-gray-500/20">
+					<View className="flex-1 pr-4">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Deep Freeze Vault (Karantina)
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Bekukan aplikasi seutuhnya sampai lenyap sementara dari sistem. 0
+							MB RAM & 0% Baterai.
+						</Text>
+					</View>
+					<Pressable
+						onPress={() => setCurrentScreen("quarantine")}
+						className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center"
+					>
+						<Snowflake size={14} color="#fff" />
+						<Text className="text-white font-bold text-xs ml-1.5">BUKA</Text>
+					</Pressable>
+				</View>
+
+				<View className="flex-row items-center justify-between py-3.5 border-b border-gray-500/20">
+					<View className="flex-1 pr-4">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Live Impact & Forensik
+						</Text>
+						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+							Lihat statistik penghematan RAM nyata & pelacak aplikasi paling
+							bandel hari ini.
+						</Text>
+					</View>
+					<Pressable
+						onPress={() => setCurrentScreen("pro_analytics")}
+						className="bg-emerald-600 px-3 py-1.5 rounded-xl flex-row items-center"
+					>
+						<Sparkles size={14} color="#fff" />
+						<Text className="text-white font-bold text-xs ml-1.5">DASBOR</Text>
+					</Pressable>
+				</View>
+
+				<SettingToggleRow
+					title="Phantom Process Slayer"
+					subtitle="Menonaktifkan pembatasan 32 phantom process bawaan Android 12+ dan membasmi anak proses yang tertinggal."
+					value={settings?.phantomSlayer ?? false}
+					onValueChange={(v) => updateSetting("phantomSlayer", v)}
+				/>
+
+				<SettingToggleRow
+					title="Bedtime Zero-Drain Shield"
+					subtitle="Saat layar padam di jam tidur malam, memotong seluruh wakelock dan memaksa HP masuk mode tidur ekstrem."
+					value={settings?.bedtimeShield ?? false}
+					onValueChange={(v) => updateSetting("bedtimeShield", v)}
+				/>
+
+				<SettingToggleRow
+					title="Emergency Smart Triggers"
+					subtitle="Otomatis mengeksekusi pembantaian massal saat baterai kritis (< 20%) atau suhu HP melampaui batas panas (> 40°C)."
+					value={settings?.emergencyTrigger ?? false}
+					onValueChange={(v) => updateSetting("emergencyTrigger", v)}
+				/>
+
+				<SettingToggleRow
+					title="RAM Crunch Auto-Slayer"
+					subtitle="Otomatis mengeksekusi pembersihan latar belakang secara real-time saat memori RAM sisa di HP anjlok di bawah 15%."
+					value={settings?.ramCrunchSlayer ?? false}
+					onValueChange={(v) => updateSetting("ramCrunchSlayer", v)}
+				/>
+
+				<Pressable
+					onPress={() => setAutoKillModal(true)}
+					className="py-3 flex-row items-center justify-between active:opacity-70"
+				>
+					<View className="flex-1 pr-4">
+						<Text className={`${colors.textClass} font-bold text-sm`}>
+							Auto-Kill Scheduler
+						</Text>
+						<Text
+							className={`${colors.subTextClass} text-[11px] mt-0.5 leading-4`}
+						>
+							Menjadwalkan eksekusi pembersihan otomatis secara berkala di latar
+							belakang tanpa membuka aplikasi.
+						</Text>
+					</View>
+					<View className="flex-row items-center">
+						<Text className="text-blue-500 font-bold text-xs mr-2">
+							{settings?.autoKillScheduler === 1
+								? "1 Jam"
+								: settings?.autoKillScheduler === 2
+									? "2 Jam"
+									: settings?.autoKillScheduler === 4
+										? "4 Jam"
+										: settings?.autoKillScheduler === 8
+											? "8 Jam"
+											: "Nonaktif"}
+						</Text>
+					</View>
+				</Pressable>
+			</View>
+
+			<Text
+				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+			>
+				9. Sistem & Reset
 			</Text>
 			<View
 				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-6 p-2`}
@@ -330,9 +447,7 @@ export const SettingsMainTab: React.FC = () => {
 					className="p-3.5 flex-row items-center justify-between active:opacity-70 rounded-xl"
 				>
 					<View className="flex-1 pr-3">
-						<Text className="text-rose-500 font-bold text-sm">
-							Reset Total
-						</Text>
+						<Text className="text-rose-500 font-bold text-sm">Reset Total</Text>
 						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
 							Mereset seluruh pengaturan, daftar aplikasi, dan membuka kembali
 							layar sambutan awal dari nol.
@@ -384,6 +499,53 @@ export const SettingsMainTab: React.FC = () => {
 				title="Sudah Diizinkan"
 				content="Aplikasi KillApps saat ini sudah diizinkan oleh sistem Android berjalan tanpa batasan baterai."
 				onClose={() => setBatteryModal(false)}
+			/>
+
+			<SelectionModal
+				visible={autoKillModal}
+				title="Auto-Kill Scheduler"
+				subtitle="Pilih interval waktu pembersihan latar belakang otomatis:"
+				options={[
+					{
+						id: "0",
+						label: "Nonaktif (Matikan)",
+						badgeType: "default",
+						description: "Tidak melakukan pembersihan berkala.",
+					},
+					{
+						id: "1",
+						label: "Setiap 1 Jam",
+						badgeType: "cyan",
+						description:
+							"Membersihkan latar belakang secara otomatis setiap 1 jam sekali.",
+					},
+					{
+						id: "2",
+						label: "Setiap 2 Jam",
+						badgeType: "cyan",
+						description:
+							"Membersihkan latar belakang secara otomatis setiap 2 jam sekali.",
+					},
+					{
+						id: "4",
+						label: "Setiap 4 Jam",
+						badgeType: "emerald",
+						description:
+							"Membersihkan latar belakang secara otomatis setiap 4 jam sekali (Sangat Disarankan).",
+					},
+					{
+						id: "8",
+						label: "Setiap 8 Jam",
+						badgeType: "cyan",
+						description:
+							"Membersihkan latar belakang secara otomatis setiap 8 jam sekali.",
+					},
+				]}
+				selectedId={String(settings?.autoKillScheduler || 0)}
+				onSelect={(id) => {
+					updateSetting("autoKillScheduler", Number(id));
+				}}
+				onClose={() => setAutoKillModal(false)}
 			/>
 		</View>
 	);
