@@ -36,6 +36,8 @@ export interface AppSettings {
 	emergencyTrigger?: boolean;
 	ramCrunchSlayer?: boolean;
 	autoKillScheduler?: number;
+	bedtimeStart?: number;
+	bedtimeEnd?: number;
 }
 
 export interface ImpactAnalytics {

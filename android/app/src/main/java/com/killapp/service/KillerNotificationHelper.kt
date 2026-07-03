@@ -162,7 +162,7 @@ class KillerNotificationHelper(private val context: Context) {
 
             for (pkg in activeTargets) {
                 val appName = try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
-                val childId = Math.abs(pkg.hashCode()) + 1000
+                val childId = (pkg.hashCode() and 0x7FFFFFFF) + 1000
                 activeNotifIds.add(childId)
 
                 val freezeIntent = Intent("com.killapp.ACTION_FREEZE_PKG")

@@ -173,6 +173,7 @@ export const setHibernationOptions = (
 	shallow: boolean,
 	wakeUp: boolean,
 	dontRemoveNotif: boolean,
+	ignoreBackgroundFree: boolean,
 ): void => {
 	if (
 		Platform.OS === "android" &&
@@ -185,6 +186,7 @@ export const setHibernationOptions = (
 			shallow,
 			wakeUp,
 			dontRemoveNotif,
+			ignoreBackgroundFree,
 		);
 	}
 };
@@ -229,6 +231,8 @@ export const setProOptions = (options: {
 	emergencyTrigger?: boolean;
 	ramCrunchSlayer?: boolean;
 	autoKillScheduler?: number;
+	bedtimeStart?: number;
+	bedtimeEnd?: number;
 }): void => {
 	if (Platform.OS === "android" && ShizukuKillerModule?.setProOptions) {
 		ShizukuKillerModule.setProOptions(options);
@@ -247,6 +251,12 @@ export const freezeQuarantinePackage = async (
 	return await ShizukuKillerModule.freezeQuarantinePackage(pkg, freeze);
 };
 
+export const getQuarantinePackages = async (): Promise<string[]> => {
+	if (Platform.OS !== "android" || !ShizukuKillerModule?.getQuarantinePackages)
+		return [];
+	return await ShizukuKillerModule.getQuarantinePackages();
+};
+
 export const getImpactAnalytics = async () => {
 	if (Platform.OS !== "android" || !ShizukuKillerModule?.getImpactAnalytics)
 		return null;
@@ -260,4 +270,18 @@ export const getResurrectionDetectiveReport = async () => {
 	)
 		return [];
 	return await ShizukuKillerModule.getResurrectionDetectiveReport();
+};
+
+export const showNativeTimePicker = async (
+	currentMinutes: number,
+): Promise<number | null> => {
+	if (Platform.OS !== "android" || !ShizukuKillerModule?.showTimePicker)
+		return null;
+	try {
+		const h = Math.floor(currentMinutes / 60);
+		const m = currentMinutes % 60;
+		return await ShizukuKillerModule.showTimePicker(h, m);
+	} catch {
+		return null;
+	}
 };

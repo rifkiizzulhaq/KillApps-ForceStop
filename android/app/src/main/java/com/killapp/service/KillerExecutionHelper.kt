@@ -119,8 +119,10 @@ object KillerExecutionHelper {
                 val useShallow = shallow || dontRemoveNotif
                 val success = if (useShallow) {
                     val r1 = ShizukuCommandHelper.executeCommand("am set-inactive $pkg true")
-                    val r2 = ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_IN_BACKGROUND ignore")
-                    r1 == 0 || r2 == 0
+                    if (gcmBypass && !dontRemoveNotif) {
+                        ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_IN_BACKGROUND ignore")
+                    }
+                    r1 == 0
                 } else {
                     ShizukuCommandHelper.forceStopPackage(pkg)
                 }
@@ -175,56 +177,95 @@ object KillerExecutionHelper {
         val dontRemoveNotif = prefs.getBoolean("dontRemoveNotif", false)
         val phantomSlayer = prefs.getBoolean("phantomSlayer", false)
 
+        // Phase 1: collect packages to attempt and filter out protected ones
+        val pkgsToAttempt = mutableListOf<String>()
+        val shallowPkgs = mutableSetOf<String>()
+
+        for (i in 0 until packageNames.size()) {
+            val pkg = packageNames.getString(i)
+            if (!pkg.isNullOrEmpty()) {
+                if (isMediaActiveProtected(context, pkg, finerMedia) || isSmartProtected(context, pkg, smart) || isQuarantineProtected(context, pkg)) {
+                    failedList.add(pkg)
+                } else {
+                    pkgsToAttempt.add(pkg)
+                    if (shallow || dontRemoveNotif) shallowPkgs.add(pkg)
+                }
+            }
+        }
+
+        if (pkgsToAttempt.isEmpty()) {
+            val result = Arguments.createMap()
+            val sa = Arguments.createArray(); val fa = Arguments.createArray()
+            failedList.forEach { fa.pushString(it) }
+            result.putArray("success", sa); result.putArray("failed", fa)
+            return result
+        }
+
+        // Phase 2: execute all commands in a single su session (fast)
         try {
             val suProcess = Runtime.getRuntime().exec("su")
             val os = DataOutputStream(suProcess.outputStream)
-            for (i in 0 until packageNames.size()) {
-                val pkg = packageNames.getString(i)
-                if (!pkg.isNullOrEmpty()) {
-                    if (isMediaActiveProtected(context, pkg, finerMedia) || isSmartProtected(context, pkg, smart) || isQuarantineProtected(context, pkg)) {
-                        failedList.add(pkg)
-                        continue
-                    }
-
-                    val useShallow = shallow || dontRemoveNotif
-                    if (useShallow) {
-                        os.writeBytes("am set-inactive $pkg true\n")
+            for (pkg in pkgsToAttempt) {
+                val useShallow = shallowPkgs.contains(pkg)
+                if (useShallow) {
+                    os.writeBytes("am set-inactive $pkg true\n")
+                    if (gcmBypass && !dontRemoveNotif) {
                         os.writeBytes("cmd appops set $pkg RUN_IN_BACKGROUND ignore\n")
-                    } else {
-                        os.writeBytes("am force-stop $pkg\n")
-                        if (gcmBypass) {
-                            os.writeBytes("cmd appops set $pkg RUN_IN_BACKGROUND ignore\n")
-                        }
                     }
-                    if (wakeUp) {
-                        os.writeBytes("cmd appops set $pkg WAKE_LOCK ignore\n")
-                        os.writeBytes("cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore\n")
-                    }
-                    os.flush()
-                    successList.add(pkg)
-                    if (useShallow) {
-                        recordShallowKill(context, pkg)
-                        if (deepTrim) {
-                            os.writeBytes("am send-trim-memory $pkg RUNNING_CRITICAL\n")
-                        }
+                } else {
+                    os.writeBytes("am force-stop $pkg\n")
+                    if (gcmBypass) {
+                        os.writeBytes("cmd appops set $pkg RUN_IN_BACKGROUND ignore\n")
                     }
                 }
+                if (wakeUp) {
+                    os.writeBytes("cmd appops set $pkg WAKE_LOCK ignore\n")
+                    os.writeBytes("cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore\n")
+                }
             }
-            if (aggDoze) {
-                os.writeBytes("dumpsys deviceidle force-idle\n")
-            }
+            if (aggDoze) os.writeBytes("dumpsys deviceidle force-idle\n")
             if (phantomSlayer && android.os.Build.VERSION.SDK_INT >= 31) {
                 os.writeBytes("settings put global settings_enable_monitor_phantom_procs false\n")
             }
             os.writeBytes("exit\n")
             os.flush()
             suProcess.waitFor()
-        } catch (e: Exception) {
-            for (i in 0 until packageNames.size()) {
-                val pkg = packageNames.getString(i)
-                if (!pkg.isNullOrEmpty() && !successList.contains(pkg)) {
+
+            // Phase 3: verify actual app state after all commands have completed
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val runningProcesses = try { am.runningAppProcesses ?: emptyList() } catch (e: Exception) { emptyList() }
+            val runningPkgs = runningProcesses.flatMap { it.pkgList?.toList() ?: emptyList() }.toSet()
+
+            for (pkg in pkgsToAttempt) {
+                val stopped = try {
+                    if (shallowPkgs.contains(pkg)) {
+                        // Shallow: verify app is no longer in running processes
+                        !runningPkgs.contains(pkg)
+                    } else {
+                        // Force-stop: verify via FLAG_STOPPED flag
+                        val info = context.packageManager.getApplicationInfo(pkg, 0)
+                        (info.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0
+                    }
+                } catch (e: Exception) {
+                    true // app not found = killed or uninstalled, count as success
+                }
+
+                if (stopped) {
+                    successList.add(pkg)
+                    if (shallowPkgs.contains(pkg)) {
+                        recordShallowKill(context, pkg)
+                        if (deepTrim) {
+                            try { Runtime.getRuntime().exec(arrayOf("su", "-c", "am send-trim-memory $pkg RUNNING_CRITICAL")).waitFor() } catch (e: Exception) {}
+                        }
+                    }
+                } else {
                     failedList.add(pkg)
                 }
+            }
+        } catch (e: Exception) {
+            // If su session failed entirely, all attempted packages are failures
+            for (pkg in pkgsToAttempt) {
+                if (!successList.contains(pkg)) failedList.add(pkg)
             }
         }
 
@@ -249,6 +290,7 @@ object KillerExecutionHelper {
         val wakeUp = prefs.getBoolean("wakeUpTracking", true)
         val dontRemoveNotif = prefs.getBoolean("dontRemoveNotif", false)
         val deepTrim = prefs.getBoolean("deepTrimMemory", false)
+        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
 
         val activeMediaPkgs = if (finerMedia) getActiveMediaPackages() else setOf()
 
@@ -257,26 +299,43 @@ object KillerExecutionHelper {
         }
 
         val useShallow = shallow || dontRemoveNotif
-        val success = if (useShallow) {
-            val r1 = ShizukuCommandHelper.executeCommand("am set-inactive $pkg true")
-            val r2 = ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_IN_BACKGROUND ignore")
-            r1 == 0 || r2 == 0
+        val success = if (mode == "root") {
+            try {
+                val killCmd = if (useShallow) "am set-inactive $pkg true" else "am force-stop $pkg"
+                Runtime.getRuntime().exec(arrayOf("su", "-c", killCmd)).waitFor() == 0
+            } catch (e: Exception) { false }
         } else {
-            ShizukuCommandHelper.forceStopPackage(pkg)
+            if (useShallow) {
+                val r1 = ShizukuCommandHelper.executeCommand("am set-inactive $pkg true")
+                if (gcmBypass && !dontRemoveNotif) {
+                    ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_IN_BACKGROUND ignore")
+                }
+                r1 == 0
+            } else {
+                ShizukuCommandHelper.forceStopPackage(pkg)
+            }
         }
 
         if (success) {
             if (useShallow) {
                 recordShallowKill(context, pkg)
                 if (deepTrim) {
-                    ShizukuCommandHelper.executeCommand("am send-trim-memory $pkg RUNNING_CRITICAL")
+                    val trimCmd = "am send-trim-memory $pkg RUNNING_CRITICAL"
+                    if (mode == "root") try { Runtime.getRuntime().exec(arrayOf("su", "-c", trimCmd)).waitFor() } catch (e: Exception) {}
+                    else ShizukuCommandHelper.executeCommand(trimCmd)
                 }
             } else if (gcmBypass) {
-                ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_IN_BACKGROUND ignore")
+                val gcmCmd = "cmd appops set $pkg RUN_IN_BACKGROUND ignore"
+                if (mode == "root") try { Runtime.getRuntime().exec(arrayOf("su", "-c", gcmCmd)).waitFor() } catch (e: Exception) {}
+                else ShizukuCommandHelper.executeCommand(gcmCmd)
             }
             if (wakeUp) {
-                ShizukuCommandHelper.executeCommand("cmd appops set $pkg WAKE_LOCK ignore")
-                ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")
+                if (mode == "root") {
+                    try { Runtime.getRuntime().exec(arrayOf("su", "-c", "cmd appops set $pkg WAKE_LOCK ignore && cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")).waitFor() } catch (e: Exception) {}
+                } else {
+                    ShizukuCommandHelper.executeCommand("cmd appops set $pkg WAKE_LOCK ignore")
+                    ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")
+                }
             }
             KillerForensicHelper.recordKillEvent(context, 1)
         }

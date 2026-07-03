@@ -1,4 +1,4 @@
-import { X, Zap } from "lucide-react-native";
+import { Shield, X, Zap } from "lucide-react-native";
 import type React from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
@@ -9,6 +9,8 @@ interface Props {
 	onRemove: (packageName: string) => void;
 	onKill?: (packageName: string) => void;
 	disabled?: boolean;
+	isSmartProtected?: boolean;
+	isMediaApp?: boolean;
 }
 
 export const HibernationListItem: React.FC<Props> = ({
@@ -16,6 +18,8 @@ export const HibernationListItem: React.FC<Props> = ({
 	onRemove,
 	onKill,
 	disabled,
+	isSmartProtected,
+	isMediaApp,
 }) => {
 	const { colors, isDark } = useTheme();
 
@@ -24,8 +28,13 @@ export const HibernationListItem: React.FC<Props> = ({
 			className={`flex-row items-center justify-between p-3.5 ${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-2.5`}
 		>
 			<Pressable
-				onPress={() => !disabled && !app.isStopped && onKill?.(app.packageName)}
-				disabled={disabled || app.isStopped}
+				onPress={() =>
+					!disabled &&
+					!app.isStopped &&
+					!isSmartProtected &&
+					onKill?.(app.packageName)
+				}
+				disabled={disabled || app.isStopped || isSmartProtected}
 				className="flex-row items-center flex-1 pr-2 active:opacity-75"
 			>
 				{app.icon ? (
@@ -62,6 +71,17 @@ export const HibernationListItem: React.FC<Props> = ({
 								</Text>
 							</View>
 						)}
+						{isMediaApp && (
+							<View
+								className={`${colors.secondaryBtnClass} border ${colors.borderClass} px-2 py-0.5 rounded`}
+							>
+								<Text
+									className={`text-[10px] font-bold ${colors.subTextClass}`}
+								>
+									Media
+								</Text>
+							</View>
+						)}
 						<View
 							className={`px-2 py-0.5 rounded border ${
 								app.isStopped
@@ -90,29 +110,42 @@ export const HibernationListItem: React.FC<Props> = ({
 			</Pressable>
 
 			<View className="flex-row items-center gap-1.5">
-				{!app.isStopped && onKill && (
-					<Pressable
-						onPress={() => !disabled && onKill(app.packageName)}
-						disabled={disabled}
-						className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${colors.primaryBtnClass} active:opacity-80`}
-					>
-						<Zap
-							size={13}
-							color={
-								colors.primaryBtnTextClass.includes("white")
-									? "#fff"
-									: isDark
-										? "#000"
-										: "#fff"
-							}
-						/>
-						<Text
-							className={`font-black text-[10px] tracking-wider uppercase ${colors.primaryBtnTextClass}`}
+				{!app.isStopped &&
+					onKill &&
+					(isSmartProtected ? (
+						<View
+							className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl opacity-40 ${colors.secondaryBtnClass}`}
 						>
-							Kill
-						</Text>
-					</Pressable>
-				)}
+							<Shield size={13} color={colors.iconColor} />
+							<Text
+								className={`font-black text-[10px] tracking-wider uppercase ${colors.subTextClass}`}
+							>
+								Smart
+							</Text>
+						</View>
+					) : (
+						<Pressable
+							onPress={() => !disabled && onKill(app.packageName)}
+							disabled={disabled}
+							className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${colors.primaryBtnClass} active:opacity-80`}
+						>
+							<Zap
+								size={13}
+								color={
+									colors.primaryBtnTextClass.includes("white")
+										? "#fff"
+										: isDark
+											? "#000"
+											: "#fff"
+								}
+							/>
+							<Text
+								className={`font-black text-[10px] tracking-wider uppercase ${colors.primaryBtnTextClass}`}
+							>
+								Kill
+							</Text>
+						</Pressable>
+					))}
 
 				<Pressable
 					onPress={() => !disabled && onRemove(app.packageName)}

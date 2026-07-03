@@ -31,13 +31,12 @@ class KillerTileService : TileService() {
 
         Thread {
             try {
-                val mode = prefs.getString("killerMode", "SHIZUKU")
-                if (mode == "ROOT") {
+                val mode = prefs.getString("workingMode", "shizuku")
+                if (mode == "root") {
                     KillerExecutionHelper.killAppsViaRoot(this, array)
                 } else {
                     KillerExecutionHelper.killAppsShizuku(this, array)
                 }
-                KillerForensicHelper.recordKillEvent(this, targets.size)
                 updateTileState()
             } catch (e: Exception) {
             }

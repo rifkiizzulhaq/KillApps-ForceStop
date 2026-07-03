@@ -181,11 +181,16 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 	killSingleApp: async (packageName: string) => {
 		try {
 			set({ isKilling: true, killMessage: null });
-			const _result = await killerService.killApps([packageName]);
+			const result = await killerService.killApps([packageName]);
+			const success = result.success.includes(packageName);
 			set((state) => ({
-				killMessage: `Berhasil menghentikan aplikasi.`,
+				killMessage: success
+					? "Berhasil menghentikan aplikasi."
+					: "Gagal menghentikan aplikasi (diproteksi atau sedang aktif digunakan).",
 				apps: state.apps.map((app) =>
-					app.packageName === packageName ? { ...app, isStopped: true } : app,
+					app.packageName === packageName && success
+						? { ...app, isStopped: true }
+						: app,
 				),
 			}));
 			await get().fetchApps();

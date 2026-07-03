@@ -11,13 +11,19 @@ import {
 	View,
 } from "react-native";
 import { useTheme } from "../hooks/useTheme";
-import { freezeQuarantinePackage } from "../services/killerService";
+import {
+	freezeQuarantinePackage,
+	getQuarantinePackages,
+} from "../services/killerService";
 import { useAppStore } from "../stores/useAppStore";
 
 export const QuarantineScreen: React.FC = () => {
 	const { colors, isDark } = useTheme();
 	const apps = useAppStore((state) => state.apps);
 	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
+	const removeFromHibernation = useAppStore(
+		(state) => state.removeFromHibernation,
+	);
 	const [frozenSet, setFrozenSet] = useState<Set<string>>(new Set());
 	const [processingPkg, setProcessingPkg] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -31,18 +37,30 @@ export const QuarantineScreen: React.FC = () => {
 		return () => sub.remove();
 	}, [setCurrentScreen]);
 
+	useEffect(() => {
+		getQuarantinePackages().then((pkgs) => {
+			setFrozenSet(new Set(pkgs));
+		});
+	}, []);
+
 	const toggleFreeze = async (pkg: string) => {
 		if (processingPkg) return;
 		setProcessingPkg(pkg);
 		const currentlyFrozen = frozenSet.has(pkg);
 		const nextState = !currentlyFrozen;
-		await freezeQuarantinePackage(pkg, nextState);
-		setFrozenSet((prev) => {
-			const next = new Set(prev);
-			if (nextState) next.add(pkg);
-			else next.delete(pkg);
-			return next;
-		});
+		const success = await freezeQuarantinePackage(pkg, nextState);
+		if (success) {
+			setFrozenSet((prev) => {
+				const next = new Set(prev);
+				if (nextState) next.add(pkg);
+				else next.delete(pkg);
+				return next;
+			});
+			// Jika difreeze, otomatis hapus dari hibernationList agar tidak muncul di home screen
+			if (nextState) {
+				removeFromHibernation(pkg);
+			}
+		}
 		setProcessingPkg(null);
 	};
 

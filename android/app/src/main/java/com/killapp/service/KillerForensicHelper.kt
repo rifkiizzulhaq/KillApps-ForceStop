@@ -53,7 +53,8 @@ object KillerForensicHelper {
                 val exitReasons = am.getHistoricalProcessExitReasons(null, 0, 30)
                 val countMap = mutableMapOf<String, Int>()
                 for (info in exitReasons) {
-                    val pkg = info.processName ?: continue
+                    val processName = info.processName ?: continue
+                    val pkg = processName.substringBefore(":")
                     if (pkg == context.packageName) continue
                     countMap[pkg] = (countMap[pkg] ?: 0) + 1
                 }
@@ -68,7 +69,7 @@ object KillerForensicHelper {
                             pkg
                         }
                         appMap.putString("appName", appName)
-                        appMap.putInt("restartCount", count * 4)
+                        appMap.putInt("restartCount", count)
                         array.pushMap(appMap)
                     }
                 }

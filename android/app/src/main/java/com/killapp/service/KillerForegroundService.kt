@@ -15,6 +15,7 @@ class KillerForegroundService : Service() {
     private lateinit var helper: KillerNotificationHelper
     private var screenReceiver: BroadcastReceiver? = null
     private var batteryReceiver: BroadcastReceiver? = null
+    private val isKillingInProgress = java.util.concurrent.atomic.AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
@@ -31,9 +32,13 @@ class KillerForegroundService : Service() {
                     if (bedtime) {
                         val cal = java.util.Calendar.getInstance()
                         val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
-                        if (hour >= 23 || hour <= 5) {
-                            shouldTrigger = true
-                        }
+                        val minute = cal.get(java.util.Calendar.MINUTE)
+                        val currentMin = hour * 60 + minute
+                        val startMin = prefs.getInt("bedtimeStart", 1380)
+                        val endMin = prefs.getInt("bedtimeEnd", 300)
+                        val isBedtime = if (startMin > endMin) currentMin >= startMin || currentMin <= endMin
+                                        else currentMin in startMin..endMin
+                        if (isBedtime) shouldTrigger = true
                     }
                     
                     if (!shouldTrigger && prefs.getBoolean("autoHibernationEnabled", false)) {
@@ -69,8 +74,9 @@ class KillerForegroundService : Service() {
                         
                         if (shouldKill) {
                             val lastEmergency = prefs.getLong("lastEmergencyKillTime", 0L)
-                            if (System.currentTimeMillis() - lastEmergency > 3600 * 1000L) {
-                                prefs.edit().putLong("lastEmergencyKillTime", System.currentTimeMillis()).apply()
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmergency > 3600 * 1000L && !isKillingInProgress.get()) {
+                                prefs.edit().putLong("lastEmergencyKillTime", now).apply()
                                 val targets = prefs.getStringSet("autoHibernationTargets", ShizukuKillerModule.autoHibernationTargets) ?: setOf()
                                 triggerAutoKill(targets)
                             }
@@ -91,20 +97,36 @@ class KillerForegroundService : Service() {
     }
 
     private fun triggerAutoKill(targets: Set<String>) {
-        if (targets.isEmpty()) return
+        if (targets.isEmpty() || !isKillingInProgress.compareAndSet(false, true)) return
         Thread {
             try {
-                val array = com.facebook.react.bridge.Arguments.createArray()
-                for (pkg in targets) array.pushString(pkg)
                 val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                val ignoreBackgroundFree = prefs.getBoolean("ignoreBackgroundFree", false)
+                val array = com.facebook.react.bridge.Arguments.createArray()
+                for (pkg in targets) {
+                    if (ignoreBackgroundFree) {
+                        val alreadyStopped = try {
+                            val info = packageManager.getApplicationInfo(pkg, 0)
+                            (info.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0
+                        } catch (e: Exception) { false }
+                        if (!alreadyStopped && !KillerAppListHelper.isAppInactiveOrShallow(this, pkg)) {
+                            array.pushString(pkg)
+                        }
+                    } else {
+                        array.pushString(pkg)
+                    }
+                }
+                if (array.size() == 0) return@Thread
                 val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
                 if (mode == "root") {
                     KillerExecutionHelper.killAppsViaRoot(this, array)
                 } else {
                     KillerExecutionHelper.killAppsShizuku(this, array)
                 }
-                KillerForensicHelper.recordKillEvent(this, targets.size)
             } catch (e: Exception) {}
+            finally {
+                isKillingInProgress.set(false)
+            }
         }.start()
     }
 
@@ -124,6 +146,7 @@ class KillerForegroundService : Service() {
                 }
 
                 val isAnyActive = enabled ||
+                        prefs.getBoolean("autoHibernationEnabled", ShizukuKillerModule.autoHibernationEnabled) ||
                         prefs.getBoolean("bedtimeShield", false) ||
                         prefs.getBoolean("emergencyTrigger", false) ||
                         prefs.getBoolean("ramCrunchSlayer", false) ||
@@ -147,8 +170,9 @@ class KillerForegroundService : Service() {
                             am.getMemoryInfo(memInfo)
                             val ratio = memInfo.availMem.toDouble() / memInfo.totalMem.toDouble()
                             val lastCrunch = prefs.getLong("lastRamCrunchTime", 0L)
-                            if (ratio < 0.15 && System.currentTimeMillis() - lastCrunch > 15 * 60 * 1000L) {
-                                prefs.edit().putLong("lastRamCrunchTime", System.currentTimeMillis()).apply()
+                            val now = System.currentTimeMillis()
+                            if (ratio < 0.15 && now - lastCrunch > 15 * 60 * 1000L && !isKillingInProgress.get()) {
+                                prefs.edit().putLong("lastRamCrunchTime", now).apply()
                                 triggerAutoKill(targets)
                             }
                         } catch (e: Exception) {}
@@ -160,7 +184,7 @@ class KillerForegroundService : Service() {
                         val now = System.currentTimeMillis()
                         if (lastScheduled == 0L) {
                             prefs.edit().putLong("lastScheduledKillTime", now).apply()
-                        } else if (now - lastScheduled > intervalHours * 3600 * 1000L) {
+                        } else if (now - lastScheduled > intervalHours * 3600 * 1000L && !isKillingInProgress.get()) {
                             prefs.edit().putLong("lastScheduledKillTime", now).apply()
                             triggerAutoKill(targets)
                         }

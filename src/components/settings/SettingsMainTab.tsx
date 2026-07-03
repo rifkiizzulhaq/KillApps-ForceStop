@@ -18,6 +18,7 @@ import { useTheme } from "../../hooks/useTheme";
 import {
 	checkBatteryOptimization,
 	requestBatteryOptimization,
+	showNativeTimePicker,
 } from "../../services/killerService";
 import { useAppStore } from "../../stores/useAppStore";
 import { InfoModal } from "../modals/InfoModal";
@@ -43,6 +44,19 @@ export const SettingsMainTab: React.FC = () => {
 	const [rootInfoModal, setRootInfoModal] = useState(false);
 	const [batteryModal, setBatteryModal] = useState(false);
 	const [autoKillModal, setAutoKillModal] = useState(false);
+
+	const handlePickBedtimeStart = async () => {
+		const min = await showNativeTimePicker(settings?.bedtimeStart ?? 1380);
+		if (min !== null) updateSetting("bedtimeStart", min);
+	};
+
+	const handlePickBedtimeEnd = async () => {
+		const min = await showNativeTimePicker(settings?.bedtimeEnd ?? 300);
+		if (min !== null) updateSetting("bedtimeEnd", min);
+	};
+
+	const fmtTime = (totalMin: number) =>
+		`${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
 
 	const handleQuickNotifChange = async (v: boolean) => {
 		if (v && Platform.OS === "android" && Number(Platform.Version) >= 33) {
@@ -198,13 +212,13 @@ export const SettingsMainTab: React.FC = () => {
 				>
 					<SettingToggleRow
 						title="KillApps Dangkal (Shallow)"
-						subtitle="Membekukan aktivitas sementara tanpa mematikan total proses aplikasi (Android 9+)."
+						subtitle="Bekukan app tanpa force-stop total (Android 9+). GCM wake-up tetap diblokir agar app tidak bisa bangkit sendiri."
 						value={settings?.shallowHibernation ?? false}
 						onValueChange={(v) => updateSetting("shallowHibernation", v)}
 					/>
 					<SettingToggleRow
 						title="Wake-up Tracking and Cut-off"
-						subtitle="Lacak aplikasi yang sering terbangun sendiri dan potong rantai pemicunya."
+						subtitle="Blokir wakelock dan background activity setelah kill, agar aplikasi tidak bisa terbangun kembali sendiri."
 						value={settings?.wakeUpTracking ?? true}
 						onValueChange={(v) => updateSetting("wakeUpTracking", v)}
 					/>
@@ -232,7 +246,7 @@ export const SettingsMainTab: React.FC = () => {
 					/>
 					<SettingToggleRow
 						title="Sertakan Aplikasi Sistem"
-						subtitle="Tampilkan dan izinkan penambahan aplikasi sistem inti ke dalam daftar KillApps."
+						subtitle="Tampilkan aplikasi sistem non-kritis di daftar agar bisa ditambahkan. App sistem kritis (SystemUI, GMS, dll) tetap diproteksi otomatis."
 						value={settings?.hibernateSystemApps ?? false}
 						onValueChange={(v) => updateSetting("hibernateSystemApps", v)}
 					/>
@@ -278,10 +292,27 @@ export const SettingsMainTab: React.FC = () => {
 
 					<SettingToggleRow
 						title="Don&apos;t Remove Notification"
-						subtitle="Jaga agar kartu notifikasi penting tidak ikut terhapus saat mematikan aplikasi."
+						subtitle="Bekukan app agar notifikasi masuk tetap tampil. GCM wake-up tidak diblokir supaya push notification dari server tetap diterima."
 						value={settings?.dontRemoveNotif ?? false}
 						onValueChange={(v) => updateSetting("dontRemoveNotif", v)}
 					/>
+					{settings?.dontRemoveNotif && settings?.wakeUpTracking && (
+						<View className="flex-row items-start gap-2.5 py-3 border-t border-amber-500/20">
+							<AlertTriangle
+								size={14}
+								color="#f59e0b"
+								style={{ marginTop: 1 }}
+							/>
+							<Text
+								className={`${colors.subTextClass} text-[11px] leading-4 flex-1`}
+							>
+								<Text className="text-amber-500 font-bold">Perhatian: </Text>
+								{
+									"Don't Remove Notification & Wake-up Tracking aktif bersamaan. Push notif mungkin masih bisa masuk via GCM, tapi semua aktivitas background lainnya tetap diblokir oleh Wake-up Tracking."
+								}
+							</Text>
+						</View>
+					)}
 				</View>
 
 				<Text
@@ -325,6 +356,13 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Setelah aplikasi dimatikan, sisa cache sampah masih tertahan di RAM. Fitur ini menyapu bersih sisa memori sampai akar. Contoh: RAM kosong melonjak lega & HP langsung terasa jauh lebih cepat (anti-lemot)."
 						value={settings?.deepTrimMemory ?? false}
 						onValueChange={(v) => updateSetting("deepTrimMemory", v)}
+					/>
+
+					<SettingToggleRow
+						title="Phantom Process Slayer"
+						subtitle="Menonaktifkan pembatasan 32 phantom process bawaan Android 12+, mencegah anak proses yang tertinggal memenuhi kuota sistem."
+						value={settings?.phantomSlayer ?? false}
+						onValueChange={(v) => updateSetting("phantomSlayer", v)}
 					/>
 				</View>
 			</View>
@@ -376,18 +414,43 @@ export const SettingsMainTab: React.FC = () => {
 				</View>
 
 				<SettingToggleRow
-					title="Phantom Process Slayer"
-					subtitle="Menonaktifkan pembatasan 32 phantom process bawaan Android 12+ dan membasmi anak proses yang tertinggal."
-					value={settings?.phantomSlayer ?? false}
-					onValueChange={(v) => updateSetting("phantomSlayer", v)}
-				/>
-
-				<SettingToggleRow
 					title="Bedtime Zero-Drain Shield"
-					subtitle="Saat layar padam di jam tidur malam, memotong seluruh wakelock dan memaksa HP masuk mode tidur ekstrem."
+					subtitle={`Saat layar mati di jam tidur (${fmtTime(settings?.bedtimeStart ?? 1380)}\u2013${fmtTime(settings?.bedtimeEnd ?? 300)}), otomatis eksekusi daftar KillApps. Jika Aggressive Doze aktif, tidur hemat daya akan langsung dimaksimalkan seketika tanpa menunggu.`}
 					value={settings?.bedtimeShield ?? false}
 					onValueChange={(v) => updateSetting("bedtimeShield", v)}
 				/>
+
+				{settings?.bedtimeShield && (
+					<View className="py-3 flex-row items-center justify-between border-t border-gray-500/10">
+						<View className="flex-1 pr-4">
+							<Text className={`${colors.textClass} font-semibold text-sm`}>
+								Jam Tidur Kustom
+							</Text>
+							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+								Atur jam mulai dan berakhir sesuai jadwal tidur Anda.
+							</Text>
+						</View>
+						<View className="flex-row items-center gap-2">
+							<Pressable
+								onPress={handlePickBedtimeStart}
+								className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
+							>
+								<Text className={`${colors.textClass} font-bold text-xs`}>
+									{fmtTime(settings?.bedtimeStart ?? 1380)}
+								</Text>
+							</Pressable>
+							<Text className={`${colors.subTextClass} text-xs`}>→</Text>
+							<Pressable
+								onPress={handlePickBedtimeEnd}
+								className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
+							>
+								<Text className={`${colors.textClass} font-bold text-xs`}>
+									{fmtTime(settings?.bedtimeEnd ?? 300)}
+								</Text>
+							</Pressable>
+						</View>
+					</View>
+				)}
 
 				<SettingToggleRow
 					title="Emergency Smart Triggers"

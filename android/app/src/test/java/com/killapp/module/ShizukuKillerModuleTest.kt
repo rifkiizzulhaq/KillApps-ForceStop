@@ -31,6 +31,10 @@ class ShizukuKillerModuleTest {
 
         every { mockReactContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE) } returns mockPrefs
         every { mockPrefs.edit() } returns mockEditor
+        every { mockEditor.putBoolean(any(), any()) } returns mockEditor
+        every { mockEditor.putString(any(), any()) } returns mockEditor
+        every { mockEditor.putInt(any(), any()) } returns mockEditor
+        every { mockEditor.putStringSet(any(), any()) } returns mockEditor
         
         // Mock static methods of Shizuku
         mockkStatic(Shizuku::class)
@@ -125,14 +129,14 @@ class ShizukuKillerModuleTest {
     fun `setHibernationOptions saves hibernation flags to SharedPreferences`() {
         every { mockEditor.putBoolean(any(), any()) } returns mockEditor
         
-        // Parameter: smart, finerMedia, shallow, wakeUp, dontRemoveNotif
-        module.setHibernationOptions(true, true, false, true, false)
+        module.setHibernationOptions(true, true, false, true, false, true)
         
         verify { mockEditor.putBoolean("smartHibernation", true) }
         verify { mockEditor.putBoolean("finerMediaDetection", true) }
         verify { mockEditor.putBoolean("shallowHibernation", false) }
         verify { mockEditor.putBoolean("wakeUpTracking", true) }
         verify { mockEditor.putBoolean("dontRemoveNotif", false) }
+        verify { mockEditor.putBoolean("ignoreBackgroundFree", true) }
         verify { mockEditor.apply() }
     }
 
@@ -158,8 +162,8 @@ class ShizukuKillerModuleTest {
         verify { mockEditor.putStringSet("postponedPackages", any()) }
         verify { mockEditor.apply() }
         
-        // Verifikasi krusial: pastikan BroadcastReceiver didaftarkan
-        verify { mockReactContext.registerReceiver(any(), any<android.content.IntentFilter>()) }
+        // Verifikasi krusial: pastikan Service dinyalakan
+        verify { mockReactContext.startService(any()) }
     }
 
     @Test

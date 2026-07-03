@@ -21,6 +21,30 @@ import { useTheme } from "../hooks/useTheme";
 import { killerService } from "../services/killerService";
 import { useAppStore } from "../stores/useAppStore";
 
+const CRITICAL_PACKAGES = new Set([
+	"android",
+	"com.android.systemui",
+	"com.android.settings",
+	"com.google.android.gms",
+	"com.google.android.inputmethod.latin",
+	"com.android.inputmethod.latin",
+	"com.google.android.apps.maps",
+	"com.waze",
+	"com.android.phone",
+	"com.android.server.telecom",
+	"com.samsung.android.dialer",
+]);
+
+const MEDIA_PACKAGES = new Set([
+	"com.spotify.music",
+	"com.google.android.apps.youtube.music",
+	"com.apple.android.music",
+	"com.tencent.ibg.joox",
+	"com.deezer.android.app",
+	"com.soundcloud.android",
+	"com.google.android.videos",
+]);
+
 export const HomeScreen: React.FC = () => {
 	const apps = useAppStore((state) => state.apps);
 	const hibernationList = useAppStore((state) => state.hibernationList);
@@ -347,6 +371,14 @@ export const HomeScreen: React.FC = () => {
 												onRemove={removeFromHibernation}
 												onKill={killSingleApp}
 												disabled={!isModeVerified}
+												isSmartProtected={Boolean(
+													settings?.smartHibernation &&
+														CRITICAL_PACKAGES.has(app.packageName),
+												)}
+												isMediaApp={Boolean(
+													settings?.finerMediaDetection &&
+														MEDIA_PACKAGES.has(app.packageName),
+												)}
 											/>
 										))}
 									</View>

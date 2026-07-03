@@ -39,7 +39,6 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     private var permissionPromise: Promise? = null
-    private var screenOffReceiver: BroadcastReceiver? = null
     private var quickActionReceiver: BroadcastReceiver? = null
     private var pollingHandler: Handler? = null
     private val iconCache = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -54,11 +53,6 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     override fun invalidate() {
         super.invalidate()
         Shizuku.removeRequestPermissionResultListener(this)
-        screenOffReceiver?.let {
-            try {
-                reactApplicationContext.unregisterReceiver(it)
-            } catch (e: Exception) {}
-        }
         quickActionReceiver?.let {
             try {
                 reactApplicationContext.unregisterReceiver(it)
@@ -84,7 +78,7 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     @ReactMethod
-    fun setHibernationOptions(smart: Boolean, finerMedia: Boolean, shallow: Boolean, wakeUp: Boolean, dontRemoveNotif: Boolean) {
+    fun setHibernationOptions(smart: Boolean, finerMedia: Boolean, shallow: Boolean, wakeUp: Boolean, dontRemoveNotif: Boolean, ignoreBackgroundFree: Boolean) {
         val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putBoolean("smartHibernation", smart)
@@ -92,6 +86,7 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             .putBoolean("shallowHibernation", shallow)
             .putBoolean("wakeUpTracking", wakeUp)
             .putBoolean("dontRemoveNotif", dontRemoveNotif)
+            .putBoolean("ignoreBackgroundFree", ignoreBackgroundFree)
             .apply()
     }
 
@@ -266,32 +261,21 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
             packages.getString(i)?.let { autoHibernationTargets.add(it) }
         }
         val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("autoHibernationTargets", autoHibernationTargets).putStringSet("postponedPackages", postponedPackages).apply()
-        if (enabled && screenOffReceiver == null) {
-            screenOffReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    if (intent?.action == Intent.ACTION_SCREEN_OFF && autoHibernationEnabled && autoHibernationTargets.isNotEmpty()) {
-                        Thread {
-                            try {
-                                if (ShizukuCommandHelper.isShizukuReady()) {
-                                    for (pkg in autoHibernationTargets) {
-                                        if (!postponedPackages.contains(pkg)) {
-                                            KillerExecutionHelper.killSinglePackageInternal(reactApplicationContext, pkg)
-                                        }
-                                    }
-                                    postponedPackages.clear()
-                                    val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                                    prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
-                                    updateNotificationDisplay()
-                                }
-                            } catch (e: Exception) {}
-                        }.start()
-                    }
-                }
+        prefs.edit()
+            .putBoolean("autoHibernationEnabled", autoHibernationEnabled)
+            .putStringSet("autoHibernationTargets", autoHibernationTargets)
+            .putStringSet("postponedPackages", postponedPackages)
+            .apply()
+
+        if (enabled) {
+            val serviceIntent = Intent(reactApplicationContext, com.killapp.service.KillerForegroundService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try { reactApplicationContext.startForegroundService(serviceIntent) } catch (e: Exception) { reactApplicationContext.startService(serviceIntent) }
+            } else {
+                reactApplicationContext.startService(serviceIntent)
             }
-            val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
-            reactApplicationContext.registerReceiver(screenOffReceiver, filter)
         }
+
         updateNotificationDisplay()
     }
 
@@ -308,32 +292,34 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                         prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
                         notificationHelper.cancelAllNotifications()
                         Thread {
-                            try {
-                                if (ShizukuCommandHelper.isShizukuReady()) {
-                                    var count = 0
-                                    val pm = reactApplicationContext.packageManager
-                                    for (pkg in autoHibernationTargets) {
-                                        val isRunning = try {
-                                            val info = pm.getApplicationInfo(pkg, 0)
-                                            (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
-                                        } catch (e: Exception) { false }
-                                        if (isRunning && KillerExecutionHelper.killSinglePackageInternal(reactApplicationContext, pkg)) {
-                                            count++
-                                        }
-                                    }
-                                    Thread.sleep(700)
-                                    Handler(Looper.getMainLooper()).post {
-                                        Toast.makeText(reactApplicationContext, "$count aplikasi berhasil di-kill!", Toast.LENGTH_SHORT).show()
-                                        try {
-                                            reactApplicationContext
-                                                .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                                                .emit("onAppsFrozen", null)
-                                        } catch (e: Exception) {}
-                                        updateNotificationDisplay()
+                        try {
+                            val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
+                            val isReady = if (mode == "root") true else ShizukuCommandHelper.isShizukuReady()
+                            if (isReady) {
+                                var count = 0
+                                val pm = reactApplicationContext.packageManager
+                                for (pkg in autoHibernationTargets) {
+                                    val isRunning = try {
+                                        val info = pm.getApplicationInfo(pkg, 0)
+                                        (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
+                                    } catch (e: Exception) { false }
+                                    if (isRunning && KillerExecutionHelper.killSinglePackageInternal(reactApplicationContext, pkg)) {
+                                        count++
                                     }
                                 }
-                            } catch (e: Exception) {}
-                        }.start()
+                                Thread.sleep(700)
+                                Handler(Looper.getMainLooper()).post {
+                                    Toast.makeText(reactApplicationContext, "$count aplikasi berhasil di-kill!", Toast.LENGTH_SHORT).show()
+                                    try {
+                                        reactApplicationContext
+                                            .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                                            .emit("onAppsFrozen", null)
+                                    } catch (e: Exception) {}
+                                    updateNotificationDisplay()
+                                }
+                            }
+                        } catch (e: Exception) {}
+                    }.start()
                     } else if (action == "com.killapp.ACTION_POSTPONE_PKG") {
                         val targetPkg = intent.getStringExtra("pkg") ?: return
                         postponedPackages.add(targetPkg)
@@ -351,11 +337,15 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                         prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
                         Thread {
                             try {
-                                if (ShizukuCommandHelper.isShizukuReady()) {
-                                    KillerExecutionHelper.killSinglePackageInternal(reactApplicationContext, targetPkg)
+                                val killPrefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                                val mode = killPrefs.getString("workingMode", "shizuku") ?: "shizuku"
+                                val isReady = if (mode == "root") true else ShizukuCommandHelper.isShizukuReady()
+                                if (isReady) {
+                                    val success = KillerExecutionHelper.killSinglePackageInternal(reactApplicationContext, targetPkg)
                                     Thread.sleep(700)
                                     Handler(Looper.getMainLooper()).post {
-                                        Toast.makeText(reactApplicationContext, "$targetName berhasil di-kill!", Toast.LENGTH_SHORT).show()
+                                        val msg = if (success) "$targetName berhasil di-kill!" else "Gagal mematikan $targetName."
+                                        Toast.makeText(reactApplicationContext, msg, Toast.LENGTH_SHORT).show()
                                         try {
                                             reactApplicationContext
                                                 .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -397,7 +387,12 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                 reactApplicationContext.startService(serviceIntent)
             }
         } else {
-            reactApplicationContext.stopService(serviceIntent)
+            val isAnyActive = prefs.getBoolean("bedtimeShield", false) ||
+                prefs.getBoolean("emergencyTrigger", false) ||
+                prefs.getBoolean("ramCrunchSlayer", false) ||
+                prefs.getInt("autoKillScheduler", 0) > 0 ||
+                prefs.getBoolean("autoHibernationEnabled", autoHibernationEnabled)
+            if (!isAnyActive) reactApplicationContext.stopService(serviceIntent)
         }
         updateNotificationDisplay(true)
     }
@@ -417,6 +412,38 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
                 promise.reject("FREEZE_ERR", e.message)
             }
         }.start()
+    }
+
+    @ReactMethod
+    fun getQuarantinePackages(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            val set = prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()
+            val array = com.facebook.react.bridge.Arguments.createArray()
+            for (pkg in set) array.pushString(pkg)
+            promise.resolve(array)
+        } catch (e: Exception) {
+            promise.reject("QUARANTINE_ERR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun showTimePicker(currentHour: Int, currentMinute: Int, promise: Promise) {
+        val activity = currentActivity
+        if (activity == null) {
+            promise.reject("NO_ACTIVITY", "No activity available")
+            return
+        }
+        Handler(Looper.getMainLooper()).post {
+            android.app.TimePickerDialog(
+                activity,
+                { _, hourOfDay, minute -> promise.resolve(hourOfDay * 60 + minute) },
+                currentHour, currentMinute, true
+            ).apply {
+                setOnCancelListener { promise.reject("CANCELLED", "Cancelled") }
+                show()
+            }
+        }
     }
 
     @ReactMethod
@@ -443,11 +470,19 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     fun setProOptions(options: ReadableMap) {
         val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         val edit = prefs.edit()
-        if (options.hasKey("phantomSlayer")) edit.putBoolean("phantomSlayer", options.getBoolean("phantomSlayer"))
+        if (options.hasKey("phantomSlayer")) {
+            val enabled = options.getBoolean("phantomSlayer")
+            edit.putBoolean("phantomSlayer", enabled)
+            if (enabled && android.os.Build.VERSION.SDK_INT >= 31) {
+                try { ShizukuCommandHelper.executeCommand("settings put global settings_enable_monitor_phantom_procs false") } catch (e: Exception) {}
+            }
+        }
         if (options.hasKey("bedtimeShield")) edit.putBoolean("bedtimeShield", options.getBoolean("bedtimeShield"))
         if (options.hasKey("emergencyTrigger")) edit.putBoolean("emergencyTrigger", options.getBoolean("emergencyTrigger"))
         if (options.hasKey("ramCrunchSlayer")) edit.putBoolean("ramCrunchSlayer", options.getBoolean("ramCrunchSlayer"))
         if (options.hasKey("autoKillScheduler")) edit.putInt("autoKillScheduler", options.getInt("autoKillScheduler"))
+        if (options.hasKey("bedtimeStart")) edit.putInt("bedtimeStart", options.getInt("bedtimeStart"))
+        if (options.hasKey("bedtimeEnd")) edit.putInt("bedtimeEnd", options.getInt("bedtimeEnd"))
         edit.apply()
 
         val isAnyActive = prefs.getBoolean("quickActionNotifEnabled", quickActionNotifEnabled) ||
