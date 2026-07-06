@@ -54,27 +54,24 @@ object KillerAppListHelper {
     }
 
     fun isAppInactiveOrShallow(context: Context, packageName: String): Boolean {
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-            val processes = am?.runningAppProcesses
-            if (processes != null) {
-                for (proc in processes) {
-                    if (proc.pkgList != null && proc.pkgList.contains(packageName)) {
-                        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                        val shallowSet = prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()
-                        if (shallowSet.contains(packageName)) {
-                            val editSet = shallowSet.toMutableSet()
-                            editSet.remove(packageName)
-                            prefs.edit().putStringSet("shallow_killed_set", editSet).apply()
-                        }
-                        return false
-                    }
-                }
-            }
-        } catch (e: Exception) {}
-
         val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         val shallowSet = prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()
-        return shallowSet.contains(packageName)
+
+        if (!shallowSet.contains(packageName)) return false
+
+        try {
+            val output = ShizukuCommandHelper.executeCommandWithOutput("am get-inactive $packageName")
+            val isStillInactive = output.contains("Inactive mode: true", ignoreCase = true) || output.contains("Idle=true", ignoreCase = true)
+            val isConfirmedActive = output.contains("Inactive mode: false", ignoreCase = true) || output.contains("Idle=false", ignoreCase = true)
+
+            if (isConfirmedActive) {
+                val editSet = shallowSet.toMutableSet()
+                editSet.remove(packageName)
+                prefs.edit().putStringSet("shallow_killed_set", editSet).apply()
+                return false
+            }
+            if (isStillInactive) return true
+        } catch (e: Exception) {}
+        return true
     }
 }

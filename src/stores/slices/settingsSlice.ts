@@ -16,6 +16,7 @@ export const createSettingsSlice: StateCreator<
 	SettingsSlice
 > = (set) => ({
 	currentScreen: "home",
+	settingsScrollY: 0,
 	showSystemApps: false,
 	isHydrated: false,
 	hasCompletedOnboarding: false,
@@ -46,6 +47,9 @@ export const createSettingsSlice: StateCreator<
 
 	setCurrentScreen: (screen) => {
 		set({ currentScreen: screen });
+	},
+	setSettingsScrollY: (y) => {
+		set({ settingsScrollY: y });
 	},
 
 	updateSetting: (key, value) => {

@@ -16,11 +16,9 @@ export const createShizukuSlice: StateCreator<
 		setKillerMode(get().settings.workingMode);
 		const isBinder = await killerService.checkBinder();
 		const isPerm = isBinder ? await killerService.checkPermission() : false;
-		const isRoot = await killerService.checkRootAccess();
 		set({
 			isShizukuActive: isBinder,
 			isPermissionGranted: isPerm,
-			isRootActive: isRoot,
 		});
 		if (get().apps.length === 0) {
 			await get().fetchApps(false);

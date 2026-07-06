@@ -7,10 +7,9 @@ import {
 	Zap,
 } from "lucide-react-native";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
-	Alert,
 	PermissionsAndroid,
 	Platform,
 	Pressable,
@@ -18,12 +17,18 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { InfoModal } from "../components/modals/InfoModal";
 import { useTheme } from "../hooks/useTheme";
 import { useAppStore } from "../stores/useAppStore";
 
 export const OnboardingScreen: React.FC = () => {
 	const [step, setStep] = useState<number>(1);
 	const [isVerifying, setIsVerifying] = useState<boolean>(false);
+	const [modalState, setModalState] = useState({
+		visible: false,
+		title: "",
+		content: "",
+	});
 
 	const [notifGranted, setNotifGranted] = useState<boolean>(
 		Platform.OS !== "android" || Number(Platform.Version) < 33,
@@ -90,10 +95,10 @@ export const OnboardingScreen: React.FC = () => {
 		}
 	}, [step, checkSystemPermissions]);
 
-	const startVerification = useCallback(async () => {
+	const startVerification = useCallback(async (mode: string) => {
 		setIsVerifying(true);
 		try {
-			if (currentMode === "root") {
+			if (mode === "root") {
 				await checkRootStatus();
 			} else {
 				await checkShizukuStatus();
@@ -101,13 +106,16 @@ export const OnboardingScreen: React.FC = () => {
 		} finally {
 			setIsVerifying(false);
 		}
-	}, [currentMode, checkRootStatus, checkShizukuStatus]);
+	}, [checkRootStatus, checkShizukuStatus]);
+
+	const prevStep = useRef(step);
 
 	useEffect(() => {
-		if (step === 3) {
-			startVerification();
+		if (step === 3 && prevStep.current !== 3) {
+			startVerification(settings.workingMode);
 		}
-	}, [step, startVerification]);
+		prevStep.current = step;
+	}, [step, settings.workingMode, startVerification]);
 
 	const allPermsGranted = notifGranted;
 	const isNextActive = step !== 2 || allPermsGranted;
@@ -421,7 +429,7 @@ export const OnboardingScreen: React.FC = () => {
 										) {
 											requestShizukuPermission();
 										} else {
-											startVerification();
+											startVerification(currentMode);
 										}
 									}}
 									className={`px-3 py-1.5 rounded border ${colors.primaryBtnClass}`}
@@ -488,10 +496,12 @@ export const OnboardingScreen: React.FC = () => {
 					<Pressable
 						onPress={() => {
 							if (!isModeVerified) {
-								Alert.alert(
-									"Layanan Belum Aktif",
-									"Silakan izinkan atau aktifkan mode Shizuku/Root terlebih dahulu agar aplikasi dapat bekerja.",
-								);
+								setModalState({
+									visible: true,
+									title: "Layanan Belum Aktif",
+									content:
+										"Silakan izinkan atau aktifkan mode Shizuku/Root terlebih dahulu agar aplikasi dapat bekerja.",
+								});
 							} else {
 								completeOnboarding();
 							}
@@ -520,6 +530,12 @@ export const OnboardingScreen: React.FC = () => {
 					</Pressable>
 				)}
 			</View>
+			<InfoModal
+				visible={modalState.visible}
+				title={modalState.title}
+				content={modalState.content}
+				onClose={() => setModalState({ ...modalState, visible: false })}
+			/>
 		</View>
 	);
 };

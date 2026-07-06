@@ -1,6 +1,7 @@
 package com.killapp.service
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableArray
@@ -37,7 +38,7 @@ object KillerExecutionHelper {
         val packages = mutableSetOf<String>()
         try {
             val output = ShizukuCommandHelper.executeCommandWithOutput("dumpsys media_session")
-            val regex = Regex("(ownerPackageName|package|Media button session is ComponentInfo\\{)([a-zA-Z0-9_.]+)")
+            val regex = Regex("(ownerPackageName=|package=|Media button session is ComponentInfo\\{)([a-zA-Z0-9_.]+)")
             val matches = regex.findAll(output)
             for (match in matches) {
                 val pkg = match.groupValues[2]
@@ -90,7 +91,57 @@ object KillerExecutionHelper {
         } catch (e: Exception) {}
     }
 
+    fun isReKillWatchlistEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("reKillWatchlistEnabled", true)
+    }
+
+    private fun addToReKillWatchlist(context: Context, pkg: String) {
+        if (!isReKillWatchlistEnabled(context)) return
+        try {
+            val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            val set = (prefs.getStringSet("reKillWatchlist", setOf()) ?: setOf()).toMutableSet()
+            set.removeAll { it.startsWith("$pkg:") }
+            set.add("$pkg:${System.currentTimeMillis()}")
+            prefs.edit()
+                .putStringSet("reKillWatchlist", set)
+                .putBoolean("reKillWatchlistActive", true)
+                .apply()
+            val intent = Intent(context, KillerForegroundService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {}
+    }
+
+    fun resetAppOps(context: Context, pkg: String, mode: String) {
+        val cmds = listOf(
+            "cmd appops set $pkg RUN_IN_BACKGROUND allow",
+            "cmd appops set $pkg WAKE_LOCK allow",
+            "cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow"
+        )
+        try {
+            if (mode == "root") {
+                val su = Runtime.getRuntime().exec("su")
+                val os = DataOutputStream(su.outputStream)
+                for (cmd in cmds) os.writeBytes("$cmd\n")
+                os.writeBytes("exit\n")
+                os.flush()
+                su.waitFor()
+            } else {
+                for (cmd in cmds) ShizukuCommandHelper.executeCommand(cmd)
+            }
+        } catch (e: Exception) {}
+    }
+
     fun killAppsShizuku(context: Context, packageNames: ReadableArray): WritableMap {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val memInfoBefore = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfoBefore)
+        val ramBeforeMb = memInfoBefore.availMem.toFloat() / (1024 * 1024)
+
         val successList = Arguments.createArray()
         val failedList = Arguments.createArray()
 
@@ -129,6 +180,7 @@ object KillerExecutionHelper {
 
                 if (success) {
                     successList.pushString(pkg)
+                    addToReKillWatchlist(context, pkg)
                     if (useShallow) {
                         recordShallowKill(context, pkg)
                         if (deepTrim) {
@@ -156,6 +208,11 @@ object KillerExecutionHelper {
 
         KillerForensicHelper.recordKillEvent(context, successList.size())
 
+        val memInfoAfter = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfoAfter)
+        val ramAfterMb = memInfoAfter.availMem.toFloat() / (1024 * 1024)
+        KillerForensicHelper.recordRealTimeRamImpact(context, ramBeforeMb, ramAfterMb)
+
         val resultMap = Arguments.createMap()
         resultMap.putArray("success", successList)
         resultMap.putArray("failed", failedList)
@@ -163,6 +220,11 @@ object KillerExecutionHelper {
     }
 
     fun killAppsViaRoot(context: Context, packageNames: ReadableArray): WritableMap {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val memInfoBefore = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfoBefore)
+        val ramBeforeMb = memInfoBefore.availMem.toFloat() / (1024 * 1024)
+
         val successList = mutableListOf<String>()
         val failedList = mutableListOf<String>()
 
@@ -212,6 +274,9 @@ object KillerExecutionHelper {
                     if (gcmBypass && !dontRemoveNotif) {
                         os.writeBytes("cmd appops set $pkg RUN_IN_BACKGROUND ignore\n")
                     }
+                    if (deepTrim) {
+                        os.writeBytes("am send-trim-memory $pkg RUNNING_CRITICAL\n")
+                    }
                 } else {
                     os.writeBytes("am force-stop $pkg\n")
                     if (gcmBypass) {
@@ -252,6 +317,7 @@ object KillerExecutionHelper {
 
                 if (stopped) {
                     successList.add(pkg)
+                    addToReKillWatchlist(context, pkg)
                     if (shallowPkgs.contains(pkg)) {
                         recordShallowKill(context, pkg)
                         if (deepTrim) {
@@ -271,6 +337,11 @@ object KillerExecutionHelper {
 
         KillerForensicHelper.recordKillEvent(context, successList.size)
 
+        val memInfoAfter = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfoAfter)
+        val ramAfterMb = memInfoAfter.availMem.toFloat() / (1024 * 1024)
+        KillerForensicHelper.recordRealTimeRamImpact(context, ramBeforeMb, ramAfterMb)
+
         val result = Arguments.createMap()
         val successArray = Arguments.createArray()
         val failedArray = Arguments.createArray()
@@ -282,6 +353,11 @@ object KillerExecutionHelper {
     }
 
     fun killSinglePackageInternal(context: Context, pkg: String): Boolean {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val memInfoBefore = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfoBefore)
+        val ramBeforeMb = memInfoBefore.availMem.toFloat() / (1024 * 1024)
+
         val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         val gcmBypass = prefs.getBoolean("gcmWakeupBypass", true)
         val smart = prefs.getBoolean("smartHibernation", true)
@@ -337,7 +413,13 @@ object KillerExecutionHelper {
                     ShizukuCommandHelper.executeCommand("cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")
                 }
             }
+            addToReKillWatchlist(context, pkg)
             KillerForensicHelper.recordKillEvent(context, 1)
+            
+            val memInfoAfter = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfoAfter)
+            val ramAfterMb = memInfoAfter.availMem.toFloat() / (1024 * 1024)
+            KillerForensicHelper.recordRealTimeRamImpact(context, ramBeforeMb, ramAfterMb)
         }
         return success
     }

@@ -46,6 +46,8 @@ export interface ImpactAnalytics {
 	totalRamSavedMb: number;
 	availMemGb: number;
 	totalMemGb: number;
+	lastRamBeforeMb?: number;
+	lastRamAfterMb?: number;
 }
 
 export interface ResurrectionItem {

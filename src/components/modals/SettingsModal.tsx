@@ -1,6 +1,6 @@
 import { X } from "lucide-react-native";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
 import { useAppStore } from "../../stores/useAppStore";
@@ -14,6 +14,8 @@ export const SettingsModal: React.FC = () => {
 	const settings = useAppStore((state) => state.settings);
 	const [activeTab, setActiveTab] = useState<"main" | "troubleshoot">("main");
 	const { colors, isDark } = useTheme();
+	const scrollRef = useRef<ScrollView>(null);
+	const initialScrollY = useRef(useAppStore.getState().settingsScrollY);
 
 	return (
 		<Modal
@@ -93,12 +95,20 @@ export const SettingsModal: React.FC = () => {
 					</View>
 
 					<ScrollView
+						ref={scrollRef}
 						className="flex-1 px-6 pt-4"
 						showsVerticalScrollIndicator={false}
 						nestedScrollEnabled={true}
 						keyboardShouldPersistTaps="handled"
 						decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
 						overScrollMode="never"
+						onLayout={() => {
+							if (initialScrollY.current > 0) {
+								scrollRef.current?.scrollTo({ y: initialScrollY.current, animated: false });
+							}
+						}}
+						onScrollEndDrag={(e) => useAppStore.getState().setSettingsScrollY(e.nativeEvent.contentOffset.y)}
+						onMomentumScrollEnd={(e) => useAppStore.getState().setSettingsScrollY(e.nativeEvent.contentOffset.y)}
 					>
 						<ShizukuStatusCard />
 

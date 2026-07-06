@@ -1,15 +1,22 @@
-import { ArrowLeft, Search, Snowflake, X } from "lucide-react-native";
+import {
+	AlertTriangle,
+	ArrowLeft,
+	Search,
+	Snowflake,
+	X,
+} from "lucide-react-native";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
 	BackHandler,
+	FlatList,
 	Image,
 	Pressable,
-	ScrollView,
 	Text,
 	TextInput,
 	View,
 } from "react-native";
+import { InfoModal } from "../components/modals/InfoModal";
 import { useTheme } from "../hooks/useTheme";
 import {
 	freezeQuarantinePackage,
@@ -27,6 +34,11 @@ export const QuarantineScreen: React.FC = () => {
 	const [frozenSet, setFrozenSet] = useState<Set<string>>(new Set());
 	const [processingPkg, setProcessingPkg] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
+	const [modalState, setModalState] = useState({
+		visible: false,
+		title: "",
+		content: "",
+	});
 
 	useEffect(() => {
 		const onBackPress = () => {
@@ -48,7 +60,10 @@ export const QuarantineScreen: React.FC = () => {
 		setProcessingPkg(pkg);
 		const currentlyFrozen = frozenSet.has(pkg);
 		const nextState = !currentlyFrozen;
-		const success = await freezeQuarantinePackage(pkg, nextState);
+		const { success, errorCode } = await freezeQuarantinePackage(
+			pkg,
+			nextState,
+		);
 		if (success) {
 			setFrozenSet((prev) => {
 				const next = new Set(prev);
@@ -56,19 +71,48 @@ export const QuarantineScreen: React.FC = () => {
 				else next.delete(pkg);
 				return next;
 			});
-			// Jika difreeze, otomatis hapus dari hibernationList agar tidak muncul di home screen
 			if (nextState) {
 				removeFromHibernation(pkg);
 			}
+		} else {
+			const title = nextState ? "Gagal Membekukan" : "Gagal Mencairkan";
+			let message = "Terjadi kesalahan tak terduga. Pastikan Shizuku aktif.";
+			if (errorCode === "webview_provider") {
+				message =
+					"Aplikasi ini sedang digunakan sebagai mesin perender web (WebView) utama oleh sistem Anda. Membekukannya sekarang akan membuat aplikasi lain error/blank putih.\n\n" +
+					"Cara aman untuk membekukannya:\n" +
+					"1. Install 'Android System WebView' dari Play Store (jika belum ada).\n" +
+					"2. Buka Pengaturan HP Anda, cari 'Penerapan WebView' atau 'WebView'.\n" +
+					"3. Ubah centangnya ke 'Android System WebView'.\n" +
+					"4. Kembali ke sini dan bekukan aplikasi ini.";
+			} else if (errorCode === "system_protected") {
+				message =
+					"Aplikasi ini diproteksi oleh sistem Android atau ROM perangkat Anda " +
+					"dan tidak dapat dinonaktifkan melalui jalur ADB/Shizuku.\n\n" +
+					"Untuk membekukan aplikasi sistem, diperlukan akses Root.";
+			} else if (errorCode === "unfreeze_failed") {
+				message =
+					"Gagal mengaktifkan kembali aplikasi. " +
+					"Coba aktifkan manual melalui Pengaturan → Aplikasi di HP Anda.";
+			}
+			setModalState({ visible: true, title, content: message });
 		}
 		setProcessingPkg(null);
 	};
 
-	const filteredApps = apps.filter(
-		(app) =>
-			app.appName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			app.packageName.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
+	const filteredApps = apps
+		.filter(
+			(app) =>
+				app.appName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				app.packageName.toLowerCase().includes(searchQuery.toLowerCase()),
+		)
+		.sort((a, b) => {
+			const aFrozen = frozenSet.has(a.packageName);
+			const bFrozen = frozenSet.has(b.packageName);
+			if (aFrozen && !bFrozen) return -1;
+			if (!aFrozen && bFrozen) return 1;
+			return a.appName.localeCompare(b.appName);
+		});
 
 	return (
 		<View className={`flex-1 ${colors.bgClass}`}>
@@ -106,6 +150,18 @@ export const QuarantineScreen: React.FC = () => {
 						dari sistem Android (0 MB RAM & 0% Baterai). Ikon aplikasi sementara
 						hilang dari homescreen HP sampai Anda mencairkannya kembali.
 					</Text>
+					<View className="mt-3 pt-3 border-t border-amber-500/20">
+						<View className="flex-row items-center gap-1.5 mb-1.5">
+							<AlertTriangle size={14} color="#f59e0b" />
+							<Text className={`${colors.textClass} font-bold text-xs`}>
+								Batas Kemampuan OS
+							</Text>
+						</View>
+						<Text className={`${colors.subTextClass} text-[11px] leading-4`}>
+							Setiap OS Android punya aturan berbeda. Beberapa aplikasi mungkin
+							menolak dibekukan total tanpa adanya akses Root yang memadai.
+						</Text>
+					</View>
 				</View>
 
 				<View
@@ -126,27 +182,34 @@ export const QuarantineScreen: React.FC = () => {
 					)}
 				</View>
 
-				<ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-					{apps.length === 0 ? (
-						<View className="p-6 bg-gray-500/10 rounded-2xl items-center my-8">
-							<Text
-								className={`${colors.subTextClass} text-xs text-center leading-relaxed`}
-							>
-								Daftar aplikasi belum dimuat. Silakan kembali ke layar utama
-								terlebih dahulu agar sistem dapat memindai daftar aplikasi di HP
-								Anda.
-							</Text>
-						</View>
-					) : filteredApps.length === 0 ? (
-						<View className="p-6 bg-gray-500/10 rounded-2xl items-center my-8">
-							<Text
-								className={`${colors.subTextClass} text-xs text-center leading-relaxed`}
-							>
-								Tidak ada aplikasi yang cocok dengan pencarian "{searchQuery}".
-							</Text>
-						</View>
-					) : (
-						filteredApps.slice(0, 50).map((app) => {
+				{apps.length === 0 ? (
+					<View className="p-6 bg-gray-500/10 rounded-2xl items-center my-8 mx-4">
+						<Text
+							className={`${colors.subTextClass} text-xs text-center leading-relaxed`}
+						>
+							Daftar aplikasi belum dimuat. Silakan kembali ke layar utama
+							terlebih dahulu agar sistem dapat memindai daftar aplikasi di HP
+							Anda.
+						</Text>
+					</View>
+				) : filteredApps.length === 0 ? (
+					<View className="p-6 bg-gray-500/10 rounded-2xl items-center my-8 mx-4">
+						<Text
+							className={`${colors.subTextClass} text-xs text-center leading-relaxed`}
+						>
+							Tidak ada aplikasi yang cocok dengan pencarian "{searchQuery}".
+						</Text>
+					</View>
+				) : (
+					<FlatList
+						data={filteredApps}
+						keyExtractor={(item) => item.packageName}
+						showsVerticalScrollIndicator={false}
+						contentContainerStyle={{ paddingBottom: 20 }}
+						initialNumToRender={15}
+						maxToRenderPerBatch={10}
+						windowSize={5}
+						renderItem={({ item: app }) => {
 							const isFrozen = frozenSet.has(app.packageName);
 							const isBusy = processingPkg === app.packageName;
 							return (
@@ -199,10 +262,16 @@ export const QuarantineScreen: React.FC = () => {
 									</Pressable>
 								</View>
 							);
-						})
-					)}
-				</ScrollView>
+						}}
+					/>
+				)}
 			</View>
+			<InfoModal
+				visible={modalState.visible}
+				title={modalState.title}
+				content={modalState.content}
+				onClose={() => setModalState({ ...modalState, visible: false })}
+			/>
 		</View>
 	);
 };

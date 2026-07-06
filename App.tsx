@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect } from "react";
-import { AppState, StatusBar } from "react-native";
+import { StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "./src/hooks/useTheme";
 import { AddAppsScreen } from "./src/screens/AddAppsScreen";
@@ -31,22 +31,6 @@ function App(): React.JSX.Element | null {
 		};
 
 		checkMode();
-		const interval = setInterval(() => {
-			if (useAppStore.getState().currentScreen !== "add_apps") {
-				checkMode();
-			}
-		}, 3000);
-
-		const sub = AppState.addEventListener("change", (nextState) => {
-			if (nextState === "active") {
-				checkMode();
-			}
-		});
-
-		return () => {
-			clearInterval(interval);
-			sub.remove();
-		};
 	}, [hasCompletedOnboarding]);
 
 	if (!isHydrated) {

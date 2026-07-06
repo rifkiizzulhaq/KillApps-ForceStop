@@ -31,6 +31,7 @@ export interface SettingsSlice {
 	settings: AppSettings;
 	isHydrated: boolean;
 	hasCompletedOnboarding: boolean;
+	settingsScrollY: number;
 	setCurrentScreen: (screen: ScreenType) => void;
 	updateSetting: <K extends keyof AppSettings>(
 		key: K,
@@ -40,6 +41,7 @@ export interface SettingsSlice {
 	setHydrated: (state: boolean) => void;
 	completeOnboarding: () => void;
 	resetOnboarding: () => void;
+	setSettingsScrollY: (y: number) => void;
 }
 
 export interface ShizukuSlice {

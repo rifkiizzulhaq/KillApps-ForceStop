@@ -401,15 +401,77 @@ class ShizukuKillerModule(reactContext: ReactApplicationContext) : ReactContextB
     fun freezeQuarantinePackage(pkg: String, freeze: Boolean, promise: Promise) {
         Thread {
             try {
-                val cmd = if (freeze) "pm disable-user --user 0 $pkg" else "pm enable $pkg"
-                val res = ShizukuCommandHelper.executeCommand(cmd)
-                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                val set = (prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()).toMutableSet()
-                if (freeze) set.add(pkg) else set.remove(pkg)
-                prefs.edit().putStringSet("quarantinePackages", set).apply()
-                promise.resolve(res == 0)
+                val result = com.facebook.react.bridge.Arguments.createMap()
+                if (freeze) {
+                    val webviewPackages = setOf("com.android.chrome", "com.google.android.webview", "com.android.webview")
+                    val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                    val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
+
+                    if (webviewPackages.contains(pkg)) {
+                        val webviewInfo = if (mode == "root") {
+                            try {
+                                val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "dumpsys webviewupdate"))
+                                val reader = java.io.BufferedReader(java.io.InputStreamReader(p.inputStream))
+                                val output = StringBuilder()
+                                var line: String?
+                                while (reader.readLine().also { line = it } != null) {
+                                    output.append(line).append("\n")
+                                }
+                                p.waitFor()
+                                output.toString()
+                            } catch (e: Exception) { "" }
+                        } else {
+                            ShizukuCommandHelper.executeCommandWithOutput("dumpsys webviewupdate")
+                        }
+                        
+                        val isActiveWebView = webviewInfo.contains("Current WebView package") &&
+                            webviewInfo.substringAfter("Current WebView package").take(100).contains(pkg)
+                        if (isActiveWebView) {
+                            result.putBoolean("success", false)
+                            result.putString("errorCode", "webview_provider")
+                            promise.resolve(result)
+                            return@Thread
+                        }
+                    }
+                    val cmd = "pm disable-user --user 0 $pkg"
+                    val exitCode = if (mode == "root") {
+                        try { Runtime.getRuntime().exec(arrayOf("su", "-c", cmd)).waitFor() } catch (e: Exception) { -1 }
+                    } else {
+                        ShizukuCommandHelper.executeCommand(cmd)
+                    }
+                    
+                    if (exitCode == 0) {
+                        val set = (prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()).toMutableSet()
+                        set.add(pkg)
+                        prefs.edit().putStringSet("quarantinePackages", set).apply()
+                        result.putBoolean("success", true)
+                        result.putString("errorCode", "ok")
+                    } else {
+                        result.putBoolean("success", false)
+                        result.putString("errorCode", "system_protected")
+                    }
+                } else {
+                    val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                    val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
+                    val cmd = "pm enable $pkg"
+                    val exitCode = if (mode == "root") {
+                        try { Runtime.getRuntime().exec(arrayOf("su", "-c", cmd)).waitFor() } catch (e: Exception) { -1 }
+                    } else {
+                        ShizukuCommandHelper.executeCommand(cmd)
+                    }
+                    
+                    val set = (prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()).toMutableSet()
+                    set.remove(pkg)
+                    prefs.edit().putStringSet("quarantinePackages", set).apply()
+                    result.putBoolean("success", exitCode == 0)
+                    result.putString("errorCode", if (exitCode == 0) "ok" else "unfreeze_failed")
+                }
+                promise.resolve(result)
             } catch (e: Exception) {
-                promise.reject("FREEZE_ERR", e.message)
+                val result = com.facebook.react.bridge.Arguments.createMap()
+                result.putBoolean("success", false)
+                result.putString("errorCode", "exception")
+                promise.resolve(result)
             }
         }.start()
     }

@@ -242,12 +242,12 @@ export const setProOptions = (options: {
 export const freezeQuarantinePackage = async (
 	pkg: string,
 	freeze: boolean,
-): Promise<boolean> => {
+): Promise<{ success: boolean; errorCode: string }> => {
 	if (
 		Platform.OS !== "android" ||
 		!ShizukuKillerModule?.freezeQuarantinePackage
 	)
-		return false;
+		return { success: false, errorCode: "unavailable" };
 	return await ShizukuKillerModule.freezeQuarantinePackage(pkg, freeze);
 };
 

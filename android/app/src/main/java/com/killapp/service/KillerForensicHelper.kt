@@ -25,6 +25,14 @@ object KillerForensicHelper {
             .apply()
     }
 
+    fun recordRealTimeRamImpact(context: Context, ramBeforeMb: Float, ramAfterMb: Float) {
+        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putFloat("lastRamBeforeMb", ramBeforeMb)
+            .putFloat("lastRamAfterMb", ramAfterMb)
+            .apply()
+    }
+
     fun getImpactAnalytics(context: Context): WritableMap {
         val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         val map = Arguments.createMap()
@@ -40,6 +48,8 @@ object KillerForensicHelper {
         val totalGb = memInfo.totalMem.toDouble() / (1024 * 1024 * 1024)
         map.putDouble("availMemGb", availGb)
         map.putDouble("totalMemGb", totalGb)
+        map.putDouble("lastRamBeforeMb", prefs.getFloat("lastRamBeforeMb", 0f).toDouble())
+        map.putDouble("lastRamAfterMb", prefs.getFloat("lastRamAfterMb", 0f).toDouble())
         return map
     }
 
@@ -47,35 +57,48 @@ object KillerForensicHelper {
         val array = Arguments.createArray()
         val pm = context.packageManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            try {
-                val exitReasons = am.getHistoricalProcessExitReasons(null, 0, 30)
-                val countMap = mutableMapOf<String, Int>()
-                for (info in exitReasons) {
-                    val processName = info.processName ?: continue
-                    val pkg = processName.substringBefore(":")
-                    if (pkg == context.packageName) continue
-                    countMap[pkg] = (countMap[pkg] ?: 0) + 1
-                }
+        try {
+            val output = ShizukuCommandHelper.executeCommandWithOutput("dumpsys activity exit-info")
+            val countMap = mutableMapOf<String, Int>()
+            var currentPkg = ""
+            
+            val lines = output.split("\n")
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
+            val now = System.currentTimeMillis()
+            val oneDayMs = 24 * 60 * 60 * 1000L
 
-                for ((pkg, count) in countMap) {
-                    if (count >= 2) {
-                        val appMap = Arguments.createMap()
-                        appMap.putString("packageName", pkg)
-                        val appName = try {
-                            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-                        } catch (e: Exception) {
-                            pkg
-                        }
-                        appMap.putString("appName", appName)
-                        appMap.putInt("restartCount", count)
-                        array.pushMap(appMap)
+            for (line in lines) {
+                val trimmed = line.trim()
+                if (trimmed.startsWith("package: ")) {
+                    currentPkg = trimmed.substringAfter("package: ").trim()
+                } else if (trimmed.startsWith("timestamp=")) {
+                    if (currentPkg.isNotEmpty() && currentPkg != context.packageName) {
+                        try {
+                            val timeStr = trimmed.substringAfter("timestamp=").substringBefore(" pid=")
+                            val date = sdf.parse(timeStr)
+                            if (date != null && now - date.time <= oneDayMs) {
+                                countMap[currentPkg] = (countMap[currentPkg] ?: 0) + 1
+                            }
+                        } catch (e: Exception) {}
                     }
                 }
-            } catch (e: Exception) {
             }
-        }
+
+            for ((pkg, count) in countMap) {
+                if (count >= 2) {
+                    val appMap = Arguments.createMap()
+                    appMap.putString("packageName", pkg)
+                    val appName = try {
+                        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                    } catch (e: Exception) {
+                        pkg
+                    }
+                    appMap.putString("appName", appName)
+                    appMap.putInt("restartCount", count)
+                    array.pushMap(appMap)
+                }
+            }
+        } catch (e: Exception) {}
 
         return array
     }

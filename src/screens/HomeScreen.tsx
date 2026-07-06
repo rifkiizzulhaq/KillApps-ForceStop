@@ -5,8 +5,8 @@ import {
 	ActivityIndicator,
 	AppState,
 	DeviceEventEmitter,
+	FlatList,
 	Pressable,
-	ScrollView,
 	Text,
 	TextInput,
 	View,
@@ -59,7 +59,7 @@ export const HomeScreen: React.FC = () => {
 	);
 	const killHibernationApps = useAppStore((state) => state.killHibernationApps);
 	const killSingleApp = useAppStore((state) => state.killSingleApp);
-	const checkShizukuStatus = useAppStore((state) => state.checkShizukuStatus);
+
 	const fetchApps = useAppStore((state) => state.fetchApps);
 	const clearKillMessage = useAppStore((state) => state.clearKillMessage);
 	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
@@ -75,7 +75,6 @@ export const HomeScreen: React.FC = () => {
 	const [showQuickKillModal, setShowQuickKillModal] = useState(false);
 
 	useEffect(() => {
-		checkShizukuStatus();
 		if (apps.length === 0) {
 			fetchApps();
 		}
@@ -131,7 +130,6 @@ export const HomeScreen: React.FC = () => {
 			appStateSub.remove();
 		};
 	}, [
-		checkShizukuStatus,
 		killHibernationApps,
 		killSingleApp,
 		fetchApps,
@@ -321,21 +319,61 @@ export const HomeScreen: React.FC = () => {
 						</View>
 					</View>
 
-					<ScrollView
+					<FlatList
 						className="flex-1 px-4 pt-3 mb-24"
 						showsVerticalScrollIndicator={false}
 						decelerationRate={settings?.smoothScroll ? 0.992 : "normal"}
 						overScrollMode="never"
-					>
-						<View className="flex-row items-center justify-between mb-3 px-2">
-							<Text
-								className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
-							>
-								Daftar KillApps ({targetApps.length})
-							</Text>
-						</View>
-
-						{targetApps.length === 0 ? (
+						data={
+							targetApps.length === 0
+								? []
+								: [
+										...(activeApps.length > 0
+											? [
+													{
+														type: "header" as const,
+														id: "header-active",
+														title: `Sedang Aktif (${activeApps.length})`,
+														dotColor: "bg-emerald-500",
+													},
+													...activeApps.map((app) => ({
+														type: "app" as const,
+														id: `active-${app.packageName}`,
+														app,
+													})),
+												]
+											: []),
+										...(hibernatedApps.length > 0
+											? [
+													{
+														type: "header" as const,
+														id: "header-hibernated",
+														title: `Sudah Di-kill / Tertidur (${hibernatedApps.length})`,
+														dotColor: "bg-zinc-400 dark:bg-zinc-600",
+													},
+													...hibernatedApps.map((app) => ({
+														type: "app" as const,
+														id: `hibernated-${app.packageName}`,
+														app,
+													})),
+												]
+											: []),
+									]
+						}
+						keyExtractor={(item) => item.id}
+						initialNumToRender={15}
+						maxToRenderPerBatch={10}
+						windowSize={5}
+						ListHeaderComponent={
+							<View className="flex-row items-center justify-between mb-3 px-2">
+								<Text
+									className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
+								>
+									Daftar KillApps ({targetApps.length})
+								</Text>
+							</View>
+						}
+						ListEmptyComponent={
 							<View className="items-center justify-center pt-16 px-6">
 								<Search size={36} color={colors.subIconColor} opacity={0.5} />
 								<Text
@@ -351,66 +389,41 @@ export const HomeScreen: React.FC = () => {
 									".
 								</Text>
 							</View>
-						) : (
-							<View className="pb-2">
-								{activeApps.length > 0 && (
-									<View className="mb-4">
-										<View className="flex-row items-center gap-2 mb-2.5 px-2">
-											<View className="w-2 h-2 rounded-full bg-emerald-500" />
-											<Text
-												testID="active-header"
-												className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
-											>
-												Sedang Aktif ({activeApps.length})
-											</Text>
-										</View>
-										{activeApps.map((app) => (
-											<HibernationListItem
-												key={app.packageName}
-												app={app}
-												onRemove={removeFromHibernation}
-												onKill={killSingleApp}
-												disabled={!isModeVerified}
-												isSmartProtected={Boolean(
-													settings?.smartHibernation &&
-														CRITICAL_PACKAGES.has(app.packageName),
-												)}
-												isMediaApp={Boolean(
-													settings?.finerMediaDetection &&
-														MEDIA_PACKAGES.has(app.packageName),
-												)}
-											/>
-										))}
-									</View>
-								)}
-
-								{hibernatedApps.length > 0 && (
-									<View className="mb-2">
-										<View
-											className={`flex-row items-center gap-2 mb-2.5 px-2 ${activeApps.length > 0 ? "mt-2" : ""}`}
+						}
+						renderItem={({ item }) => {
+							if (item.type === "header") {
+								return (
+									<View className={`flex-row items-center gap-2 mb-2.5 px-2 ${item.id === "header-hibernated" && activeApps.length > 0 ? "mt-4" : ""}`}>
+										<View className={`w-2 h-2 rounded-full ${item.dotColor}`} />
+										<Text
+											className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
 										>
-											<View className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600" />
-											<Text
-												testID="hibernated-header"
-												className={`${colors.captionClass} font-bold text-xs tracking-wider uppercase`}
-											>
-												Sudah Di-kill / Tertidur ({hibernatedApps.length})
-											</Text>
-										</View>
-										{hibernatedApps.map((app) => (
-											<HibernationListItem
-												key={app.packageName}
-												app={app}
-												onRemove={removeFromHibernation}
-												onKill={killSingleApp}
-												disabled={!isModeVerified}
-											/>
-										))}
+											{item.title}
+										</Text>
 									</View>
-								)}
-							</View>
-						)}
-					</ScrollView>
+								);
+							}
+
+							const app = item.app;
+							return (
+								<HibernationListItem
+									key={app.packageName}
+									app={app}
+									onRemove={removeFromHibernation}
+									onKill={killSingleApp}
+									disabled={!isModeVerified}
+									isSmartProtected={Boolean(
+										settings?.smartHibernation &&
+											CRITICAL_PACKAGES.has(app.packageName),
+									)}
+									isMediaApp={Boolean(
+										settings?.finerMediaDetection &&
+											MEDIA_PACKAGES.has(app.packageName),
+									)}
+								/>
+							);
+						}}
+					/>
 				</>
 			)}
 

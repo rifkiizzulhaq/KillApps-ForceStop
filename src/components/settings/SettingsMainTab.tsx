@@ -193,12 +193,14 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Analisis pintar untuk menunda eksekusi saat aplikasi sedang melakukan tugas penting."
 						value={settings?.smartHibernation ?? true}
 						onValueChange={(v) => updateSetting("smartHibernation", v)}
+						disabled={!isModeVerified}
 					/>
 					<SettingToggleRow
 						title="Finer Detection (Media Playback)"
 						subtitle="Mencegah pemotongan pemutaran musik atau video yang berjalan di latar belakang."
 						value={settings?.finerMediaDetection ?? false}
 						onValueChange={(v) => updateSetting("finerMediaDetection", v)}
+						disabled={!isModeVerified}
 					/>
 				</View>
 
@@ -215,12 +217,14 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Bekukan app tanpa force-stop total (Android 9+). GCM wake-up tetap diblokir agar app tidak bisa bangkit sendiri."
 						value={settings?.shallowHibernation ?? false}
 						onValueChange={(v) => updateSetting("shallowHibernation", v)}
+						disabled={!isModeVerified}
 					/>
 					<SettingToggleRow
 						title="Wake-up Tracking and Cut-off"
 						subtitle="Blokir wakelock dan background activity setelah kill, agar aplikasi tidak bisa terbangun kembali sendiri."
 						value={settings?.wakeUpTracking ?? true}
 						onValueChange={(v) => updateSetting("wakeUpTracking", v)}
+						disabled={!isModeVerified}
 					/>
 				</View>
 
@@ -237,18 +241,21 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Eksekusi penghentian aplikasi latar belakang otomatis setelah layar ponsel dimatikan."
 						value={settings?.autoHibernation ?? false}
 						onValueChange={(v) => updateSetting("autoHibernation", v)}
+						disabled={!isModeVerified}
 					/>
 					<SettingToggleRow
 						title="Always Ignore Background-free"
 						subtitle="Lewati aplikasi yang sudah bersih dan tidak memiliki layanan latar belakang aktif."
 						value={settings?.ignoreBackgroundFree ?? false}
 						onValueChange={(v) => updateSetting("ignoreBackgroundFree", v)}
+						disabled={!isModeVerified}
 					/>
 					<SettingToggleRow
 						title="Sertakan Aplikasi Sistem"
 						subtitle="Tampilkan aplikasi sistem non-kritis di daftar agar bisa ditambahkan. App sistem kritis (SystemUI, GMS, dll) tetap diproteksi otomatis."
 						value={settings?.hibernateSystemApps ?? false}
 						onValueChange={(v) => updateSetting("hibernateSystemApps", v)}
+						disabled={!isModeVerified}
 					/>
 					<Pressable
 						testID="battery-optimization-button"
@@ -288,6 +295,7 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Tampilkan pintasan eksekusi cepat 1-ketuk pada panel notifikasi atas."
 						value={settings?.quickActionNotif ?? false}
 						onValueChange={handleQuickNotifChange}
+						disabled={!isModeVerified}
 					/>
 
 					<SettingToggleRow
@@ -295,6 +303,7 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Bekukan app agar notifikasi masuk tetap tampil. GCM wake-up tidak diblokir supaya push notification dari server tetap diterima."
 						value={settings?.dontRemoveNotif ?? false}
 						onValueChange={(v) => updateSetting("dontRemoveNotif", v)}
+						disabled={!isModeVerified}
 					/>
 					{settings?.dontRemoveNotif && settings?.wakeUpTracking && (
 						<View className="flex-row items-start gap-2.5 py-3 border-t border-amber-500/20">
@@ -342,6 +351,7 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Normalnya HP menunggu 30-60 menit setelah layar mati untuk tidur hemat daya. Fitur ini memaksa sistem langsung tertidur lelap detik itu juga. Contoh: Baterai tetap utuh 100% saat ditaruh di saku/tidur malam."
 						value={settings?.aggressiveDoze ?? false}
 						onValueChange={(v) => updateSetting("aggressiveDoze", v)}
+						disabled={!isModeVerified}
 					/>
 
 					<SettingToggleRow
@@ -349,6 +359,7 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Seringkali aplikasi e-commerce/medsos yang dibunuh tiba-tiba hidup lagi karena ada sinyal promo dari server Google. Fitur ini memblokir sinyal kebangkitan itu. Contoh: Shopee/IG benar-benar mati total sampai Anda klik sendiri."
 						value={settings?.gcmWakeupBypass ?? true}
 						onValueChange={(v) => updateSetting("gcmWakeupBypass", v)}
+						disabled={!isModeVerified}
 					/>
 
 					<SettingToggleRow
@@ -356,25 +367,34 @@ export const SettingsMainTab: React.FC = () => {
 						subtitle="Setelah aplikasi dimatikan, sisa cache sampah masih tertahan di RAM. Fitur ini menyapu bersih sisa memori sampai akar. Contoh: RAM kosong melonjak lega & HP langsung terasa jauh lebih cepat (anti-lemot)."
 						value={settings?.deepTrimMemory ?? false}
 						onValueChange={(v) => updateSetting("deepTrimMemory", v)}
+						disabled={!isModeVerified}
 					/>
 
-					<SettingToggleRow
-						title="Phantom Process Slayer"
-						subtitle="Menonaktifkan pembatasan 32 phantom process bawaan Android 12+, mencegah anak proses yang tertinggal memenuhi kuota sistem."
-						value={settings?.phantomSlayer ?? false}
-						onValueChange={(v) => updateSetting("phantomSlayer", v)}
-					/>
+					{Platform.OS === "android" && Number(Platform.Version) >= 31 && (
+						<SettingToggleRow
+							title="Phantom Process Slayer"
+							subtitle="Menonaktifkan pembatasan 32 phantom process bawaan Android 12+, mencegah anak proses yang tertinggal memenuhi kuota sistem."
+							value={settings?.phantomSlayer ?? false}
+							onValueChange={(v) => updateSetting("phantomSlayer", v)}
+							disabled={!isModeVerified}
+						/>
+					)}
 				</View>
 			</View>
 
-			<Text
-				className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
-			>
-				8. KILLAPPS PRO SUITE (EKSKLUSIF)
-			</Text>
 			<View
-				className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-4 p-4`}
+				testID="pro-suite-disabled-wrapper"
+				pointerEvents={isModeVerified ? "auto" : "none"}
+				style={{ opacity: isModeVerified ? 1 : 0.4 }}
 			>
+				<Text
+					className={`${colors.captionClass} font-black text-[11px] tracking-wider uppercase mb-2 mt-4`}
+				>
+					8. KILLAPPS PRO SUITE (EKSKLUSIF)
+				</Text>
+				<View
+					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-4 p-4`}
+				>
 				<View className="flex-row items-center justify-between pb-3.5 border-b border-gray-500/20">
 					<View className="flex-1 pr-4">
 						<Text className={`${colors.textClass} font-bold text-sm`}>
@@ -418,6 +438,7 @@ export const SettingsMainTab: React.FC = () => {
 					subtitle={`Saat layar mati di jam tidur (${fmtTime(settings?.bedtimeStart ?? 1380)}\u2013${fmtTime(settings?.bedtimeEnd ?? 300)}), otomatis eksekusi daftar KillApps. Jika Aggressive Doze aktif, tidur hemat daya akan langsung dimaksimalkan seketika tanpa menunggu.`}
 					value={settings?.bedtimeShield ?? false}
 					onValueChange={(v) => updateSetting("bedtimeShield", v)}
+					disabled={!isModeVerified}
 				/>
 
 				{settings?.bedtimeShield && (
@@ -457,6 +478,7 @@ export const SettingsMainTab: React.FC = () => {
 					subtitle="Otomatis mengeksekusi pembantaian massal saat baterai kritis (< 20%) atau suhu HP melampaui batas panas (> 40°C)."
 					value={settings?.emergencyTrigger ?? false}
 					onValueChange={(v) => updateSetting("emergencyTrigger", v)}
+					disabled={!isModeVerified}
 				/>
 
 				<SettingToggleRow
@@ -464,6 +486,7 @@ export const SettingsMainTab: React.FC = () => {
 					subtitle="Otomatis mengeksekusi pembersihan latar belakang secara real-time saat memori RAM sisa di HP anjlok di bawah 15%."
 					value={settings?.ramCrunchSlayer ?? false}
 					onValueChange={(v) => updateSetting("ramCrunchSlayer", v)}
+					disabled={!isModeVerified}
 				/>
 
 				<Pressable
@@ -495,6 +518,8 @@ export const SettingsMainTab: React.FC = () => {
 						</Text>
 					</View>
 				</Pressable>
+			</View>
+
 			</View>
 
 			<Text
@@ -541,10 +566,15 @@ export const SettingsMainTab: React.FC = () => {
 					},
 				]}
 				selectedId={settings?.workingMode}
-				onSelect={(id) => {
+				onSelect={async (id) => {
 					updateSetting("workingMode", id as "shizuku" | "root");
 					if (id === "root") {
-						setTimeout(() => setRootInfoModal(true), 300);
+						const isRoot = await useAppStore.getState().checkRootStatus();
+						if (!isRoot) {
+							setRootInfoModal(true);
+						}
+					} else {
+						useAppStore.getState().checkShizukuStatus();
 					}
 				}}
 				onClose={() => setWorkingModeModal(false)}

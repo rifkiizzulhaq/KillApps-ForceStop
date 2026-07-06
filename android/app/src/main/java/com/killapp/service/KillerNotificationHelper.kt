@@ -87,6 +87,7 @@ class KillerNotificationHelper(private val context: Context) {
                     NotificationManager.IMPORTANCE_LOW
                 )
                 actionChannel.description = "Pintasan cepat untuk mematikan aplikasi"
+                actionChannel.setShowBadge(false)
                 notificationManager.createNotificationChannel(actionChannel)
             }
 
@@ -264,6 +265,7 @@ class KillerNotificationHelper(private val context: Context) {
                 NotificationManager.IMPORTANCE_MIN
             )
             bgChannel.description = "Notifikasi layanan pemantau KillApps"
+            bgChannel.setShowBadge(false)
             notificationManager.createNotificationChannel(bgChannel)
         }
         val pm = context.packageManager
