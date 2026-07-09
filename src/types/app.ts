@@ -13,6 +13,7 @@ export type KillerMode = "shizuku" | "root";
 export interface KillResult {
 	success: string[];
 	failed: string[];
+	webviewSkipped?: string[];
 }
 
 export interface AppSettings {

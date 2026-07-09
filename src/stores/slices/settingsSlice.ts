@@ -5,7 +5,7 @@ import {
 	setHibernationOptions,
 	setKillerMode,
 	setProOptions,
-} from "../../services/killerService";
+} from "../../services/killer";
 import type { KillerMode } from "../../types/app";
 import type { AppState, SettingsSlice } from "../../types/store";
 
@@ -62,9 +62,6 @@ export const createSettingsSlice: StateCreator<
 		set((state) => {
 			const newSettings = { ...state.settings, [key]: value };
 			const updates: Partial<AppState> = { settings: newSettings };
-			if (key === "hibernateSystemApps") {
-				updates.showSystemApps = value as boolean;
-			}
 			setGeekOptions(
 				newSettings.aggressiveDoze ?? false,
 				newSettings.gcmWakeupBypass ?? true,
@@ -93,10 +90,8 @@ export const createSettingsSlice: StateCreator<
 
 	toggleShowSystemApps: () => {
 		set((state) => {
-			const nextVal = !state.showSystemApps;
 			return {
-				showSystemApps: nextVal,
-				settings: { ...state.settings, hibernateSystemApps: nextVal },
+				showSystemApps: !state.showSystemApps,
 			};
 		});
 	},
@@ -104,6 +99,14 @@ export const createSettingsSlice: StateCreator<
 	setHydrated: (stateVal) => {
 		set((state) => {
 			if (stateVal) {
+				if (state.settings?.workingMode) {
+					setKillerMode(state.settings.workingMode);
+				}
+				if (state.settings?.quickActionNotif !== undefined) {
+					killerService.setQuickActionNotification(
+						state.settings.quickActionNotif,
+					);
+				}
 				setGeekOptions(
 					state.settings?.aggressiveDoze ?? false,
 					state.settings?.gcmWakeupBypass ?? true,

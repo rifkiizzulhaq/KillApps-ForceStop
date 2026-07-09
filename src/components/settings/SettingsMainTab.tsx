@@ -19,10 +19,11 @@ import {
 	checkBatteryOptimization,
 	requestBatteryOptimization,
 	showNativeTimePicker,
-} from "../../services/killerService";
+} from "../../services/killer";
 import { useAppStore } from "../../stores/useAppStore";
-import { InfoModal } from "../modals/InfoModal";
-import { SelectionModal } from "../modals/SelectionModal";
+import { AutoKillModal } from "../modals/AutoKillModal";
+import { BatteryOptimizationModal } from "../modals/BatteryOptimizationModal";
+import { WorkingModeModal } from "../modals/WorkingModeModal";
 import { SettingToggleRow } from "./SettingToggleRow";
 
 export const SettingsMainTab: React.FC = () => {
@@ -41,7 +42,6 @@ export const SettingsMainTab: React.FC = () => {
 			: isShizukuActive && isPermissionGranted;
 
 	const [workingModeModal, setWorkingModeModal] = useState(false);
-	const [rootInfoModal, setRootInfoModal] = useState(false);
 	const [batteryModal, setBatteryModal] = useState(false);
 	const [autoKillModal, setAutoKillModal] = useState(false);
 
@@ -395,131 +395,132 @@ export const SettingsMainTab: React.FC = () => {
 				<View
 					className={`${colors.cardClass} border ${colors.cardBorderClass} rounded-2xl mb-4 p-4`}
 				>
-				<View className="flex-row items-center justify-between pb-3.5 border-b border-gray-500/20">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Deep Freeze Vault (Karantina)
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Bekukan aplikasi seutuhnya sampai lenyap sementara dari sistem. 0
-							MB RAM & 0% Baterai.
-						</Text>
-					</View>
-					<Pressable
-						onPress={() => setCurrentScreen("quarantine")}
-						className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center"
-					>
-						<Snowflake size={14} color="#fff" />
-						<Text className="text-white font-bold text-xs ml-1.5">BUKA</Text>
-					</Pressable>
-				</View>
-
-				<View className="flex-row items-center justify-between py-3.5 border-b border-gray-500/20">
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Live Impact & Forensik
-						</Text>
-						<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-							Lihat statistik penghematan RAM nyata & pelacak aplikasi paling
-							bandel hari ini.
-						</Text>
-					</View>
-					<Pressable
-						onPress={() => setCurrentScreen("pro_analytics")}
-						className="bg-emerald-600 px-3 py-1.5 rounded-xl flex-row items-center"
-					>
-						<Sparkles size={14} color="#fff" />
-						<Text className="text-white font-bold text-xs ml-1.5">DASBOR</Text>
-					</Pressable>
-				</View>
-
-				<SettingToggleRow
-					title="Bedtime Zero-Drain Shield"
-					subtitle={`Saat layar mati di jam tidur (${fmtTime(settings?.bedtimeStart ?? 1380)}\u2013${fmtTime(settings?.bedtimeEnd ?? 300)}), otomatis eksekusi daftar KillApps. Jika Aggressive Doze aktif, tidur hemat daya akan langsung dimaksimalkan seketika tanpa menunggu.`}
-					value={settings?.bedtimeShield ?? false}
-					onValueChange={(v) => updateSetting("bedtimeShield", v)}
-					disabled={!isModeVerified}
-				/>
-
-				{settings?.bedtimeShield && (
-					<View className="py-3 flex-row items-center justify-between border-t border-gray-500/10">
+					<View className="flex-row items-center justify-between pb-3.5 border-b border-gray-500/20">
 						<View className="flex-1 pr-4">
-							<Text className={`${colors.textClass} font-semibold text-sm`}>
-								Jam Tidur Kustom
+							<Text className={`${colors.textClass} font-bold text-sm`}>
+								Deep Freeze Vault (Karantina)
 							</Text>
 							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
-								Atur jam mulai dan berakhir sesuai jadwal tidur Anda.
+								Bekukan aplikasi seutuhnya sampai lenyap sementara dari sistem.
+								0 MB RAM & 0% Baterai.
 							</Text>
 						</View>
-						<View className="flex-row items-center gap-2">
-							<Pressable
-								onPress={handlePickBedtimeStart}
-								className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
-							>
-								<Text className={`${colors.textClass} font-bold text-xs`}>
-									{fmtTime(settings?.bedtimeStart ?? 1380)}
-								</Text>
-							</Pressable>
-							<Text className={`${colors.subTextClass} text-xs`}>→</Text>
-							<Pressable
-								onPress={handlePickBedtimeEnd}
-								className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
-							>
-								<Text className={`${colors.textClass} font-bold text-xs`}>
-									{fmtTime(settings?.bedtimeEnd ?? 300)}
-								</Text>
-							</Pressable>
-						</View>
-					</View>
-				)}
-
-				<SettingToggleRow
-					title="Emergency Smart Triggers"
-					subtitle="Otomatis mengeksekusi pembantaian massal saat baterai kritis (< 20%) atau suhu HP melampaui batas panas (> 40°C)."
-					value={settings?.emergencyTrigger ?? false}
-					onValueChange={(v) => updateSetting("emergencyTrigger", v)}
-					disabled={!isModeVerified}
-				/>
-
-				<SettingToggleRow
-					title="RAM Crunch Auto-Slayer"
-					subtitle="Otomatis mengeksekusi pembersihan latar belakang secara real-time saat memori RAM sisa di HP anjlok di bawah 15%."
-					value={settings?.ramCrunchSlayer ?? false}
-					onValueChange={(v) => updateSetting("ramCrunchSlayer", v)}
-					disabled={!isModeVerified}
-				/>
-
-				<Pressable
-					onPress={() => setAutoKillModal(true)}
-					className="py-3 flex-row items-center justify-between active:opacity-70"
-				>
-					<View className="flex-1 pr-4">
-						<Text className={`${colors.textClass} font-bold text-sm`}>
-							Auto-Kill Scheduler
-						</Text>
-						<Text
-							className={`${colors.subTextClass} text-[11px] mt-0.5 leading-4`}
+						<Pressable
+							onPress={() => setCurrentScreen("quarantine")}
+							className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center"
 						>
-							Menjadwalkan eksekusi pembersihan otomatis secara berkala di latar
-							belakang tanpa membuka aplikasi.
-						</Text>
+							<Snowflake size={14} color="#fff" />
+							<Text className="text-white font-bold text-xs ml-1.5">BUKA</Text>
+						</Pressable>
 					</View>
-					<View className="flex-row items-center">
-						<Text className="text-blue-500 font-bold text-xs mr-2">
-							{settings?.autoKillScheduler === 1
-								? "1 Jam"
-								: settings?.autoKillScheduler === 2
-									? "2 Jam"
-									: settings?.autoKillScheduler === 4
-										? "4 Jam"
-										: settings?.autoKillScheduler === 8
-											? "8 Jam"
-											: "Nonaktif"}
-						</Text>
-					</View>
-				</Pressable>
-			</View>
 
+					<View className="flex-row items-center justify-between py-3.5 border-b border-gray-500/20">
+						<View className="flex-1 pr-4">
+							<Text className={`${colors.textClass} font-bold text-sm`}>
+								Live Impact & Forensik
+							</Text>
+							<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+								Lihat statistik penghematan RAM nyata & pelacak aplikasi paling
+								bandel hari ini.
+							</Text>
+						</View>
+						<Pressable
+							onPress={() => setCurrentScreen("pro_analytics")}
+							className="bg-emerald-600 px-3 py-1.5 rounded-xl flex-row items-center"
+						>
+							<Sparkles size={14} color="#fff" />
+							<Text className="text-white font-bold text-xs ml-1.5">
+								DASBOR
+							</Text>
+						</Pressable>
+					</View>
+
+					<SettingToggleRow
+						title="Bedtime Zero-Drain Shield"
+						subtitle={`Saat layar mati di jam tidur (${fmtTime(settings?.bedtimeStart ?? 1380)}\u2013${fmtTime(settings?.bedtimeEnd ?? 300)}), otomatis eksekusi daftar KillApps. Jika Aggressive Doze aktif, tidur hemat daya akan langsung dimaksimalkan seketika tanpa menunggu.`}
+						value={settings?.bedtimeShield ?? false}
+						onValueChange={(v) => updateSetting("bedtimeShield", v)}
+						disabled={!isModeVerified}
+					/>
+
+					{settings?.bedtimeShield && (
+						<View className="py-3 flex-row items-center justify-between border-t border-gray-500/10">
+							<View className="flex-1 pr-4">
+								<Text className={`${colors.textClass} font-semibold text-sm`}>
+									Jam Tidur Kustom
+								</Text>
+								<Text className={`${colors.subTextClass} text-[11px] mt-0.5`}>
+									Atur jam mulai dan berakhir sesuai jadwal tidur Anda.
+								</Text>
+							</View>
+							<View className="flex-row items-center gap-2">
+								<Pressable
+									onPress={handlePickBedtimeStart}
+									className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
+								>
+									<Text className={`${colors.textClass} font-bold text-xs`}>
+										{fmtTime(settings?.bedtimeStart ?? 1380)}
+									</Text>
+								</Pressable>
+								<Text className={`${colors.subTextClass} text-xs`}>→</Text>
+								<Pressable
+									onPress={handlePickBedtimeEnd}
+									className={`px-3 py-1.5 rounded-xl ${colors.secondaryBtnClass} border ${colors.borderClass} active:opacity-70`}
+								>
+									<Text className={`${colors.textClass} font-bold text-xs`}>
+										{fmtTime(settings?.bedtimeEnd ?? 300)}
+									</Text>
+								</Pressable>
+							</View>
+						</View>
+					)}
+
+					<SettingToggleRow
+						title="Emergency Smart Triggers"
+						subtitle="Otomatis mengeksekusi pembantaian massal saat baterai kritis (< 20%) atau suhu HP melampaui batas panas (> 40°C)."
+						value={settings?.emergencyTrigger ?? false}
+						onValueChange={(v) => updateSetting("emergencyTrigger", v)}
+						disabled={!isModeVerified}
+					/>
+
+					<SettingToggleRow
+						title="RAM Crunch Auto-Slayer"
+						subtitle="Otomatis mengeksekusi pembersihan latar belakang secara real-time saat memori RAM sisa di HP anjlok di bawah 15%."
+						value={settings?.ramCrunchSlayer ?? false}
+						onValueChange={(v) => updateSetting("ramCrunchSlayer", v)}
+						disabled={!isModeVerified}
+					/>
+
+					<Pressable
+						onPress={() => setAutoKillModal(true)}
+						className="py-3 flex-row items-center justify-between active:opacity-70"
+					>
+						<View className="flex-1 pr-4">
+							<Text className={`${colors.textClass} font-bold text-sm`}>
+								Auto-Kill Scheduler
+							</Text>
+							<Text
+								className={`${colors.subTextClass} text-[11px] mt-0.5 leading-4`}
+							>
+								Menjadwalkan eksekusi pembersihan otomatis secara berkala di
+								latar belakang tanpa membuka aplikasi.
+							</Text>
+						</View>
+						<View className="flex-row items-center">
+							<Text className="text-blue-500 font-bold text-xs mr-2">
+								{settings?.autoKillScheduler === 1
+									? "1 Jam"
+									: settings?.autoKillScheduler === 2
+										? "2 Jam"
+										: settings?.autoKillScheduler === 4
+											? "4 Jam"
+											: settings?.autoKillScheduler === 8
+												? "8 Jam"
+												: "Nonaktif"}
+							</Text>
+						</View>
+					</Pressable>
+				</View>
 			</View>
 
 			<Text
@@ -545,99 +546,18 @@ export const SettingsMainTab: React.FC = () => {
 				</Pressable>
 			</View>
 
-			<SelectionModal
+			<WorkingModeModal
 				visible={workingModeModal}
-				title="Pilih Mode Bekerja"
-				subtitle="Tentukan metode eksekusi untuk mematikan aplikasi di latar belakang:"
-				options={[
-					{
-						id: "shizuku",
-						label: "Shizuku",
-						badgeType: "emerald",
-						description:
-							"Akses nirkabel berkecepatan tinggi via ADB tanpa perlu root. Sangat stabil dan aman.",
-					},
-					{
-						id: "root",
-						label: "Root Akses",
-						badgeType: "amber",
-						description:
-							"Eksekusi langsung ke kernel sistem daya tinggi. Membutuhkan perizinan Magisk atau KernelSU.",
-					},
-				]}
-				selectedId={settings?.workingMode}
-				onSelect={async (id) => {
-					updateSetting("workingMode", id as "shizuku" | "root");
-					if (id === "root") {
-						const isRoot = await useAppStore.getState().checkRootStatus();
-						if (!isRoot) {
-							setRootInfoModal(true);
-						}
-					} else {
-						useAppStore.getState().checkShizukuStatus();
-					}
-				}}
 				onClose={() => setWorkingModeModal(false)}
 			/>
 
-			<InfoModal
-				visible={rootInfoModal}
-				title="Informasi Mode Root"
-				content="Pastikan perangkat Anda sudah di-root menggunakan Magisk atau KernelSU. Berikan izin Superuser (Grant) saat diminta oleh pop-up sistem agar fitur eksekusi cepat ini bekerja optimal tanpa hambatan."
-				onClose={() => setRootInfoModal(false)}
-			/>
-
-			<InfoModal
+			<BatteryOptimizationModal
 				visible={batteryModal}
-				title="Sudah Diizinkan"
-				content="Aplikasi KillApps saat ini sudah diizinkan oleh sistem Android berjalan tanpa batasan baterai."
 				onClose={() => setBatteryModal(false)}
 			/>
 
-			<SelectionModal
+			<AutoKillModal
 				visible={autoKillModal}
-				title="Auto-Kill Scheduler"
-				subtitle="Pilih interval waktu pembersihan latar belakang otomatis:"
-				options={[
-					{
-						id: "0",
-						label: "Nonaktif (Matikan)",
-						badgeType: "default",
-						description: "Tidak melakukan pembersihan berkala.",
-					},
-					{
-						id: "1",
-						label: "Setiap 1 Jam",
-						badgeType: "cyan",
-						description:
-							"Membersihkan latar belakang secara otomatis setiap 1 jam sekali.",
-					},
-					{
-						id: "2",
-						label: "Setiap 2 Jam",
-						badgeType: "cyan",
-						description:
-							"Membersihkan latar belakang secara otomatis setiap 2 jam sekali.",
-					},
-					{
-						id: "4",
-						label: "Setiap 4 Jam",
-						badgeType: "emerald",
-						description:
-							"Membersihkan latar belakang secara otomatis setiap 4 jam sekali (Sangat Disarankan).",
-					},
-					{
-						id: "8",
-						label: "Setiap 8 Jam",
-						badgeType: "cyan",
-						description:
-							"Membersihkan latar belakang secara otomatis setiap 8 jam sekali.",
-					},
-				]}
-				selectedId={String(settings?.autoKillScheduler || 0)}
-				onSelect={(id) => {
-					updateSetting("autoKillScheduler", Number(id));
-				}}
 				onClose={() => setAutoKillModal(false)}
 			/>
 		</View>

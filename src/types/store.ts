@@ -13,6 +13,8 @@ export interface AppsSlice {
 	isLoading: boolean;
 	isKilling: boolean;
 	killMessage: string | null;
+	webviewModalVisible: boolean;
+	setWebviewModalVisible: (visible: boolean) => void;
 	hibernationList: string[];
 	addSelectedToHibernation: () => void;
 	removeFromHibernation: (packageName: string) => void;
@@ -44,13 +46,14 @@ export interface SettingsSlice {
 	setSettingsScrollY: (y: number) => void;
 }
 
-export interface ShizukuSlice {
+export interface PermissionsSlice {
 	isShizukuActive: boolean;
 	isPermissionGranted: boolean;
 	isRootActive: boolean;
+	checkWorkingModeStatus: () => Promise<boolean>;
 	checkShizukuStatus: () => Promise<void>;
 	requestShizukuPermission: () => Promise<void>;
 	checkRootStatus: () => Promise<boolean>;
 }
 
-export type AppState = AppsSlice & SettingsSlice & ShizukuSlice;
+export type AppState = AppsSlice & SettingsSlice & PermissionsSlice;

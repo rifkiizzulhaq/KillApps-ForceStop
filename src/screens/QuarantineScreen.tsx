@@ -21,12 +21,13 @@ import { useTheme } from "../hooks/useTheme";
 import {
 	freezeQuarantinePackage,
 	getQuarantinePackages,
-} from "../services/killerService";
+} from "../services/killer";
 import { useAppStore } from "../stores/useAppStore";
 
 export const QuarantineScreen: React.FC = () => {
 	const { colors, isDark } = useTheme();
 	const apps = useAppStore((state) => state.apps);
+	const workingMode = useAppStore((state) => state.settings.workingMode);
 	const setCurrentScreen = useAppStore((state) => state.setCurrentScreen);
 	const removeFromHibernation = useAppStore(
 		(state) => state.removeFromHibernation,
@@ -76,7 +77,10 @@ export const QuarantineScreen: React.FC = () => {
 			}
 		} else {
 			const title = nextState ? "Gagal Membekukan" : "Gagal Mencairkan";
-			let message = "Terjadi kesalahan tak terduga. Pastikan Shizuku aktif.";
+			let message = `Terjadi kesalahan tak terduga. Pastikan ${
+				workingMode === "root" ? "akses Root diberikan" : "Shizuku aktif"
+			}.`;
+
 			if (errorCode === "webview_provider") {
 				message =
 					"Aplikasi ini sedang digunakan sebagai mesin perender web (WebView) utama oleh sistem Anda. Membekukannya sekarang akan membuat aplikasi lain error/blank putih.\n\n" +
@@ -88,8 +92,17 @@ export const QuarantineScreen: React.FC = () => {
 			} else if (errorCode === "system_protected") {
 				message =
 					"Aplikasi ini diproteksi oleh sistem Android atau ROM perangkat Anda " +
-					"dan tidak dapat dinonaktifkan melalui jalur ADB/Shizuku.\n\n" +
-					"Untuk membekukan aplikasi sistem, diperlukan akses Root.";
+					`dan tidak dapat dinonaktifkan melalui jalur ${
+						workingMode === "root" ? "Root" : "ADB/Shizuku"
+					}.\n\n`;
+
+				if (workingMode !== "root") {
+					message +=
+						"Untuk membekukan aplikasi sistem ini secara paksa, Anda mungkin memerlukan akses Root.";
+				} else {
+					message +=
+						"Sistem operasi Anda (ROM) memiliki perlindungan ketat terhadap aplikasi sistem inti ini sehingga akses Root sekalipun tidak bisa menonaktifkannya.";
+				}
 			} else if (errorCode === "unfreeze_failed") {
 				message =
 					"Gagal mengaktifkan kembali aplikasi. " +

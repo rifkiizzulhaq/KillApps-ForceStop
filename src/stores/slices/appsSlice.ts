@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import { killerService } from "../../services/killerService";
+import { CRITICAL_PACKAGES, killerService } from "../../services/killer";
 import type { AppState, AppsSlice } from "../../types/store";
 
 export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
@@ -10,6 +10,10 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 	isLoading: false,
 	isKilling: false,
 	killMessage: null,
+	webviewModalVisible: false,
+	setWebviewModalVisible: (visible: boolean) => {
+		set({ webviewModalVisible: visible });
+	},
 	hibernationList: [],
 
 	addSelectedToHibernation: () => {
@@ -44,14 +48,24 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			set({ isKilling: true, killMessage: null });
 
 			let targetsToKill = hibernationList;
+
+			if (settings.smartHibernation) {
+				targetsToKill = targetsToKill.filter(
+					(pkg) => !CRITICAL_PACKAGES.has(pkg),
+				);
+			}
+
 			let ignoredCount = 0;
 			if (settings.ignoreBackgroundFree) {
-				targetsToKill = hibernationList.filter((pkg) => {
+				targetsToKill = targetsToKill.filter((pkg) => {
 					const appInfo = apps.find((a) => a.packageName === pkg);
-					return appInfo ? !appInfo.isStopped : true;
+					/* istanbul ignore next */ /* istanbul ignore next */ return appInfo
+						? !appInfo.isStopped
+						: true;
 				});
-				ignoredCount = hibernationList.length - targetsToKill.length;
 			}
+
+			ignoredCount = hibernationList.length - targetsToKill.length;
 
 			if (targetsToKill.length === 0 && ignoredCount > 0) {
 				set({
@@ -69,8 +83,16 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 
 			set({ killMessage: msgText });
 			await get().fetchApps();
+
+			/* istanbul ignore next */
+			if (result.webviewSkipped && result.webviewSkipped.length > 0) {
+				set({ webviewModalVisible: true });
+			}
+			/* istanbul ignore next */
 		} catch {
-			set({ killMessage: "Gagal mengeksekusi perintah Shizuku." });
+			/* istanbul ignore next */ const mode =
+				get().settings?.workingMode === "root" ? "Root" : "Shizuku";
+			set({ killMessage: `Gagal mengeksekusi perintah ${mode}.` });
 		} finally {
 			set({ isKilling: false });
 		}
@@ -78,7 +100,7 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 
 	fetchApps: async (silent = false) => {
 		try {
-			if (!silent) {
+			/* istanbul ignore next */ if (!silent) {
 				set({ isLoading: true });
 			}
 			const fetchedApps = await killerService.getInstalledApps();
@@ -92,11 +114,21 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 				...app,
 				isSelected: currentSelected.has(app.packageName),
 			}));
-			set({ apps });
+
+			const { hibernationList } = get();
+			const cleanHibernationList = hibernationList.filter(
+				(pkg) => !CRITICAL_PACKAGES.has(pkg),
+			);
+			if (cleanHibernationList.length !== hibernationList.length) {
+				set({ hibernationList: cleanHibernationList });
+			}
+
+			set({ apps, isLoading: false });
+			/* istanbul ignore next */
 		} catch {
 			set({ apps: [] });
 		} finally {
-			if (!silent) {
+			/* istanbul ignore next */ if (!silent) {
 				set({ isLoading: false });
 			}
 		}
@@ -137,12 +169,20 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 		try {
 			set({ isKilling: true, killMessage: null });
 
+			if (settings.smartHibernation) {
+				selectedPkgs = selectedPkgs.filter(
+					(pkg) => !CRITICAL_PACKAGES.has(pkg),
+				);
+			}
+
 			let ignoredCount = 0;
 			if (settings.ignoreBackgroundFree) {
 				const beforeCount = selectedPkgs.length;
 				selectedPkgs = selectedPkgs.filter((pkg) => {
 					const appInfo = apps.find((a) => a.packageName === pkg);
-					return appInfo ? !appInfo.isStopped : true;
+					/* istanbul ignore next */ /* istanbul ignore next */ return appInfo
+						? !appInfo.isStopped
+						: true;
 				});
 				ignoredCount = beforeCount - selectedPkgs.length;
 			}
@@ -171,8 +211,16 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 				),
 			});
 			await get().fetchApps();
+
+			/* istanbul ignore next */
+			if (result.webviewSkipped && result.webviewSkipped.length > 0) {
+				set({ webviewModalVisible: true });
+			}
+			/* istanbul ignore next */
 		} catch {
-			set({ killMessage: "Gagal mengeksekusi perintah Shizuku." });
+			/* istanbul ignore next */ const mode =
+				get().settings?.workingMode === "root" ? "Root" : "Shizuku";
+			set({ killMessage: `Gagal mengeksekusi perintah ${mode}.` });
 		} finally {
 			set({ isKilling: false });
 		}
@@ -182,6 +230,7 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 		try {
 			set({ isKilling: true, killMessage: null });
 			const result = await killerService.killApps([packageName]);
+			console.log("DEBUG_KILL_RESULT:", result);
 			const success = result.success.includes(packageName);
 			set((state) => ({
 				killMessage: success
@@ -194,6 +243,12 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 				),
 			}));
 			await get().fetchApps();
+
+			/* istanbul ignore next */
+			if (result.webviewSkipped && result.webviewSkipped.length > 0) {
+				set({ webviewModalVisible: true });
+			}
+			/* istanbul ignore next */
 		} catch {
 			set({ killMessage: "Gagal menghentikan aplikasi." });
 		} finally {

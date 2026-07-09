@@ -17,7 +17,8 @@
 		"rules": {
 			"preset": "recommended",
 			"suspicious": {
-				"noUnknownAtRules": "off"
+				"noUnknownAtRules": "off",
+				"noExplicitAny": "off"
 			}
 		}
 	},

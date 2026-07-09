@@ -21,13 +21,8 @@ function App(): React.JSX.Element | null {
 	useEffect(() => {
 		if (!hasCompletedOnboarding) return;
 
-		const checkMode = () => {
-			const mode = useAppStore.getState().settings.workingMode;
-			if (mode === "root") {
-				useAppStore.getState().checkRootStatus();
-			} else {
-				useAppStore.getState().checkShizukuStatus();
-			}
+		const checkMode = async () => {
+			await useAppStore.getState().checkWorkingModeStatus();
 		};
 
 		checkMode();

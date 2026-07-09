@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useTheme } from "../../hooks/useTheme";
 import { useAppStore } from "../../stores/useAppStore";
-import { ShizukuStatusCard } from "../common/ShizukuStatusCard";
+import { ModeStatusCard } from "../common/ModeStatusCard";
 import { SettingsMainTab } from "../settings/SettingsMainTab";
 import { SettingsTroubleshootTab } from "../settings/SettingsTroubleshootTab";
 
@@ -104,13 +104,24 @@ export const SettingsModal: React.FC = () => {
 						overScrollMode="never"
 						onLayout={() => {
 							if (initialScrollY.current > 0) {
-								scrollRef.current?.scrollTo({ y: initialScrollY.current, animated: false });
+								scrollRef.current?.scrollTo({
+									y: initialScrollY.current,
+									animated: false,
+								});
 							}
 						}}
-						onScrollEndDrag={(e) => useAppStore.getState().setSettingsScrollY(e.nativeEvent.contentOffset.y)}
-						onMomentumScrollEnd={(e) => useAppStore.getState().setSettingsScrollY(e.nativeEvent.contentOffset.y)}
+						onScrollEndDrag={(e) =>
+							useAppStore
+								.getState()
+								.setSettingsScrollY(e.nativeEvent.contentOffset.y)
+						}
+						onMomentumScrollEnd={(e) =>
+							useAppStore
+								.getState()
+								.setSettingsScrollY(e.nativeEvent.contentOffset.y)
+						}
 					>
-						<ShizukuStatusCard />
+						<ModeStatusCard />
 
 						{activeTab === "main" ? (
 							<SettingsMainTab />

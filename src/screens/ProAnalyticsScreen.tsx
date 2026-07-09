@@ -20,7 +20,7 @@ import { useTheme } from "../hooks/useTheme";
 import {
 	getImpactAnalytics,
 	getResurrectionDetectiveReport,
-} from "../services/killerService";
+} from "../services/killer";
 import { useAppStore } from "../stores/useAppStore";
 import type { ImpactAnalytics, ResurrectionItem } from "../types/app";
 
@@ -124,11 +124,19 @@ export const ProAnalyticsScreen: React.FC = () => {
 										</Text>
 									</View>
 									<View className="flex-row justify-between pt-3 border-t border-blue-500/20">
-										<Text className={`${colors.subTextClass} text-sm font-bold`}>
+										<Text
+											className={`${colors.subTextClass} text-sm font-bold`}
+										>
 											Memori Terbebas Instan:
 										</Text>
 										<Text className="text-blue-500 font-black text-base">
-											+{Math.max(0, (analytics?.lastRamAfterMb ?? 0) - (analytics?.lastRamBeforeMb ?? 0)).toFixed(0)} MB
+											+
+											{Math.max(
+												0,
+												(analytics?.lastRamAfterMb ?? 0) -
+													(analytics?.lastRamBeforeMb ?? 0),
+											).toFixed(0)}{" "}
+											MB
 										</Text>
 									</View>
 								</View>
@@ -173,7 +181,9 @@ export const ProAnalyticsScreen: React.FC = () => {
 										Resurrection Detective (Wall of Shame)
 									</Text>
 								</View>
-								<Text className={`${colors.subTextClass} text-xs mb-3 leading-5`}>
+								<Text
+									className={`${colors.subTextClass} text-xs mb-3 leading-5`}
+								>
 									Daftar aplikasi paling bandel yang terus mencoba bangkit
 									diam-diam di latar belakang hari ini:
 								</Text>
@@ -213,7 +223,8 @@ export const ProAnalyticsScreen: React.FC = () => {
 						) : (
 							<View className="p-6 bg-gray-500/10 rounded-2xl items-center my-2">
 								<Text className={`${colors.subTextClass} text-xs text-center`}>
-									Tidak ada aplikasi yang cocok dengan pencarian "{searchQuery}".
+									Tidak ada aplikasi yang cocok dengan pencarian "{searchQuery}
+									".
 								</Text>
 							</View>
 						)
@@ -237,7 +248,9 @@ export const ProAnalyticsScreen: React.FC = () => {
 										<View
 											className={`w-10 h-10 rounded-xl mr-3 ${colors.secondaryBtnClass} items-center justify-center`}
 										>
-											<Text className={`${colors.textClass} font-bold text-base`}>
+											<Text
+												className={`${colors.textClass} font-bold text-base`}
+											>
 												{item.appName.charAt(0).toUpperCase()}
 											</Text>
 										</View>

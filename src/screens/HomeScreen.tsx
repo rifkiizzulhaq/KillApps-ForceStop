@@ -1,4 +1,4 @@
-import { Brain, Layers, Plus, Search, Snowflake, X } from "lucide-react-native";
+import { Plus, Search, X } from "lucide-react-native";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -12,38 +12,21 @@ import {
 	View,
 } from "react-native";
 import { HeaderMenu } from "../components/common/HeaderMenu";
-import { ShizukuStatusCard } from "../components/common/ShizukuStatusCard";
+import { ModeStatusCard } from "../components/common/ModeStatusCard";
+import { HomeEmptyState } from "../components/home/HomeEmptyState";
+import { KillMessageCard } from "../components/home/KillMessageCard";
 import { HibernationListItem } from "../components/lists/HibernationListItem";
 import { AboutModal } from "../components/modals/AboutModal";
+import { InfoModal } from "../components/modals/InfoModal";
 import { QuickKillModal } from "../components/modals/QuickKillModal";
 import { SettingsModal } from "../components/modals/SettingsModal";
 import { useTheme } from "../hooks/useTheme";
-import { killerService } from "../services/killerService";
+import {
+	CRITICAL_PACKAGES,
+	killerService,
+	MEDIA_PACKAGES,
+} from "../services/killer";
 import { useAppStore } from "../stores/useAppStore";
-
-const CRITICAL_PACKAGES = new Set([
-	"android",
-	"com.android.systemui",
-	"com.android.settings",
-	"com.google.android.gms",
-	"com.google.android.inputmethod.latin",
-	"com.android.inputmethod.latin",
-	"com.google.android.apps.maps",
-	"com.waze",
-	"com.android.phone",
-	"com.android.server.telecom",
-	"com.samsung.android.dialer",
-]);
-
-const MEDIA_PACKAGES = new Set([
-	"com.spotify.music",
-	"com.google.android.apps.youtube.music",
-	"com.apple.android.music",
-	"com.tencent.ibg.joox",
-	"com.deezer.android.app",
-	"com.soundcloud.android",
-	"com.google.android.videos",
-]);
 
 export const HomeScreen: React.FC = () => {
 	const apps = useAppStore((state) => state.apps);
@@ -54,6 +37,10 @@ export const HomeScreen: React.FC = () => {
 	const isLoading = useAppStore((state) => state.isLoading);
 	const isKilling = useAppStore((state) => state.isKilling);
 	const killMessage = useAppStore((state) => state.killMessage);
+	const webviewModalVisible = useAppStore((state) => state.webviewModalVisible);
+	const setWebviewModalVisible = useAppStore(
+		(state) => state.setWebviewModalVisible,
+	);
 	const removeFromHibernation = useAppStore(
 		(state) => state.removeFromHibernation,
 	);
@@ -129,12 +116,7 @@ export const HomeScreen: React.FC = () => {
 			frozenSub.remove();
 			appStateSub.remove();
 		};
-	}, [
-		killHibernationApps,
-		killSingleApp,
-		fetchApps,
-		apps.length,
-	]);
+	}, [killHibernationApps, killSingleApp, fetchApps, apps.length]);
 
 	useEffect(() => {
 		killerService.setAutoHibernationConfig(
@@ -166,11 +148,18 @@ export const HomeScreen: React.FC = () => {
 				app.packageName.toLowerCase().includes(searchQuery.toLowerCase()),
 		);
 
-	const activeApps = targetApps.filter((a) => !a.isStopped);
-	const hibernatedApps = targetApps.filter((a) => a.isStopped);
+	const filterSmart = (app: import("../types/app").AppInfo) =>
+		!(settings?.smartHibernation && CRITICAL_PACKAGES.has(app.packageName));
+
+	const activeApps = targetApps.filter((a) => !a.isStopped && filterSmart(a));
+	const hibernatedApps = targetApps.filter(
+		(a) => a.isStopped && filterSmart(a),
+	);
+
+	const filteredTargetApps = targetApps.filter(filterSmart);
 	const activeTargetsCount = settings?.ignoreBackgroundFree
 		? activeApps.length
-		: targetApps.length;
+		: filteredTargetApps.length;
 
 	return (
 		<View className={`flex-1 ${colors.bgClass}`}>
@@ -218,48 +207,17 @@ export const HomeScreen: React.FC = () => {
 
 			{!isModeVerified && (
 				<View className="px-4 pt-3">
-					<ShizukuStatusCard />
+					<ModeStatusCard />
 				</View>
 			)}
 
 			{killMessage && (
-				<Pressable
-					testID="kill-message-pressable"
-					onPress={clearKillMessage}
-					className={`mx-4 mt-3 ${colors.cardClass} border ${colors.cardBorderClass} p-4 rounded-2xl flex-row justify-between items-center`}
-				>
-					<View className="flex-1 mr-2">
-						<Text
-							testID="kill-message-text"
-							className={`${colors.textClass} text-xs font-semibold leading-5`}
-						>
-							{killMessage}
-						</Text>
-						{(settings?.smartHibernation || settings?.shallowHibernation) && (
-							<View className="flex-row flex-wrap items-center gap-2 mt-2">
-								{settings?.smartHibernation && (
-									<View className="flex-row items-center bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
-										<Brain size={13} color="#3b82f6" />
-										<Text className="text-[11px] text-blue-500 font-bold ml-1.5">
-											Smart KillApps aktif
-										</Text>
-									</View>
-								)}
-								{settings?.shallowHibernation && (
-									<View className="flex-row items-center bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
-										<Snowflake size={13} color="#06b6d4" />
-										<Text className="text-[11px] text-cyan-500 font-bold ml-1.5">
-											KillApps dangkal diterapkan
-										</Text>
-									</View>
-								)}
-							</View>
-						)}
-					</View>
-					<View className="ml-2">
-						<X size={16} color={colors.iconColor} />
-					</View>
-				</Pressable>
+				<KillMessageCard
+					killMessage={killMessage}
+					clearKillMessage={clearKillMessage}
+					isSmartHibernation={Boolean(settings?.smartHibernation)}
+					isShallowHibernation={Boolean(settings?.shallowHibernation)}
+				/>
 			)}
 
 			{hibernationList.length > 0 && (isLoading || apps.length === 0) ? (
@@ -276,26 +234,7 @@ export const HomeScreen: React.FC = () => {
 					</Text>
 				</View>
 			) : targetApps.length === 0 && searchQuery === "" ? (
-				<View className="flex-1 items-center justify-center px-8">
-					<View
-						className={`w-24 h-24 rounded-full ${colors.cardClass} border ${colors.cardBorderClass} items-center justify-center mb-6`}
-					>
-						<Layers size={40} color={colors.iconColor} />
-					</View>
-					<Text
-						testID="empty-state-text"
-						className={`${colors.textClass} font-bold text-xl mb-2 text-center`}
-					>
-						Selamat Datang di KillApps
-					</Text>
-					<Text
-						className={`${colors.subTextClass} text-center text-sm leading-6 mb-8`}
-					>
-						Belum ada aplikasi yang ditambahkan ke daftar KillApps. Tekan tombol
-						+ di bawah untuk memilih aplikasi latar belakang yang ingin
-						dimatikan otomatis.
-					</Text>
-				</View>
+				<HomeEmptyState />
 			) : (
 				<>
 					<View className="px-4 pt-3 pb-1">
@@ -393,7 +332,9 @@ export const HomeScreen: React.FC = () => {
 						renderItem={({ item }) => {
 							if (item.type === "header") {
 								return (
-									<View className={`flex-row items-center gap-2 mb-2.5 px-2 ${item.id === "header-hibernated" && activeApps.length > 0 ? "mt-4" : ""}`}>
+									<View
+										className={`flex-row items-center gap-2 mb-2.5 px-2 ${item.id === "header-hibernated" && activeApps.length > 0 ? "mt-4" : ""}`}
+									>
 										<View className={`w-2 h-2 rounded-full ${item.dotColor}`} />
 										<Text
 											className={`${colors.textClass} font-black text-xs tracking-wider uppercase`}
@@ -480,6 +421,15 @@ export const HomeScreen: React.FC = () => {
 			>
 				<Plus size={28} color="#ffffff" strokeWidth={3} />
 			</Pressable>
+
+			<InfoModal
+				visible={webviewModalVisible}
+				title="Aplikasi WebView Dilewati"
+				content={
+					"Sistem melewati proses kill untuk aplikasi WebView karena saat ini sedang digunakan sebagai penyedia WebView default di Opsi Developer (agar tidak crash).\n\nUbah pengaturan default-nya ke 'Android System WebView' terlebih dahulu untuk bisa mematikannya."
+				}
+				onClose={() => setWebviewModalVisible(false)}
+			/>
 		</View>
 	);
 };

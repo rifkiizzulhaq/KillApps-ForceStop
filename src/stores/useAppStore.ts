@@ -3,8 +3,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { AppState } from "../types/store";
 import { createAppsSlice } from "./slices/appsSlice";
+import { createPermissionsSlice } from "./slices/permissionsSlice";
 import { createSettingsSlice } from "./slices/settingsSlice";
-import { createShizukuSlice } from "./slices/shizukuSlice";
 
 export * from "../types/store";
 
@@ -13,7 +13,7 @@ export const useAppStore = create<AppState>()(
 		(...a) => ({
 			...createAppsSlice(...a),
 			...createSettingsSlice(...a),
-			...createShizukuSlice(...a),
+			...createPermissionsSlice(...a),
 		}),
 		{
 			name: "killapp-storage",

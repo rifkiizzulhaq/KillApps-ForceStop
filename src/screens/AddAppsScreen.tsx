@@ -13,6 +13,7 @@ import {
 import { HeaderMenu } from "../components/common/HeaderMenu";
 import { AppListItem } from "../components/lists/AppListItem";
 import { useTheme } from "../hooks/useTheme";
+import { CRITICAL_PACKAGES } from "../services/killer";
 import { useAppStore } from "../stores/useAppStore";
 
 export const AddAppsScreen: React.FC = () => {
@@ -24,10 +25,7 @@ export const AddAppsScreen: React.FC = () => {
 	const addSelectedToHibernation = useAppStore(
 		(state) => state.addSelectedToHibernation,
 	);
-	const showSystemApps = useAppStore((state) => state.showSystemApps);
-	const toggleShowSystemApps = useAppStore(
-		(state) => state.toggleShowSystemApps,
-	);
+	const updateSetting = useAppStore((state) => state.updateSetting);
 	const hibernationList = useAppStore((state) => state.hibernationList);
 	const isRootActive = useAppStore((state) => state.isRootActive);
 	const isShizukuActive = useAppStore((state) => state.isShizukuActive);
@@ -73,7 +71,8 @@ export const AddAppsScreen: React.FC = () => {
 
 	const runningApps = apps
 		.filter((app) => !hibernationList.includes(app.packageName))
-		.filter((app) => (showSystemApps ? true : !app.isSystemApp))
+		.filter((app) => !CRITICAL_PACKAGES.has(app.packageName))
+		.filter((app) => (settings.hibernateSystemApps ? true : !app.isSystemApp))
 		.filter((app) => !app.isStopped)
 		.filter(
 			(app) =>
@@ -83,7 +82,8 @@ export const AddAppsScreen: React.FC = () => {
 
 	const otherApps = apps
 		.filter((app) => !hibernationList.includes(app.packageName))
-		.filter((app) => (showSystemApps ? true : !app.isSystemApp))
+		.filter((app) => !CRITICAL_PACKAGES.has(app.packageName))
+		.filter((app) => (settings.hibernateSystemApps ? true : !app.isSystemApp))
 		.filter((app) => app.isStopped)
 		.filter(
 			(app) =>
@@ -133,8 +133,12 @@ export const AddAppsScreen: React.FC = () => {
 					options={[
 						{
 							label: "Tampilkan Aplikasi Sistem",
-							active: showSystemApps,
-							onPress: toggleShowSystemApps,
+							active: settings.hibernateSystemApps,
+							onPress: () =>
+								updateSetting(
+									"hibernateSystemApps",
+									!settings.hibernateSystemApps,
+								),
 						},
 					]}
 				/>
