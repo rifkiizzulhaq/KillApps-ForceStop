@@ -41,6 +41,7 @@ object ProcessKiller {
 
     fun resetAppOps(context: Context, pkg: String) {
         val cmds = listOf(
+            "am set-inactive $pkg false",
             "cmd appops set $pkg RUN_IN_BACKGROUND allow",
             "cmd appops set $pkg WAKE_LOCK allow",
             "cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow"
@@ -77,7 +78,7 @@ object ProcessKiller {
         val dontRemoveNotif = prefs.getBoolean("dontRemoveNotif", false)
         val phantomSlayer = prefs.getBoolean("phantomSlayer", false)
 
-        val activeMediaPkgs = if (finerMedia) ProtectionFilter.getActiveMediaPackages(context) else setOf()
+        val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(context)
 
         for (i in 0 until packageNames.size()) {
             val pkg = packageNames.getString(i)
@@ -89,6 +90,7 @@ object ProcessKiller {
                 if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia, activeMediaPkgs) || 
                     ProtectionFilter.isSmartProtected(context, pkg, smart) || 
                     ProtectionFilter.isQuarantineProtected(context, pkg)) {
+                    Thread { resetAppOps(context, pkg) }.start()
                     failedList.pushString(pkg)
                     continue
                 }
@@ -96,7 +98,7 @@ object ProcessKiller {
                 val useShallow = shallow || dontRemoveNotif
                 val success = if (useShallow) {
                     val r1 = CommandExecutor.executeCommand(context, "am set-inactive $pkg true")
-                    if (gcmBypass && !dontRemoveNotif && !ProtectionFilter.isAppOpsExempt(context, pkg)) {
+                    if (gcmBypass && !dontRemoveNotif && !ProtectionFilter.isAppOpsExempt(context, pkg) && !ProtectionFilter.isMediaOrAudioApp(context, pkg)) {
                         CommandExecutor.executeCommand(context, "cmd appops set $pkg RUN_IN_BACKGROUND ignore")
                     }
                     r1 == 0
@@ -112,7 +114,7 @@ object ProcessKiller {
                         if (deepTrim) {
                             CommandExecutor.executeCommand(context, "am send-trim-memory $pkg RUNNING_CRITICAL")
                         }
-                    } else if (gcmBypass && !ProtectionFilter.isAppOpsExempt(context, pkg)) {
+                    } else if (gcmBypass && !ProtectionFilter.isAppOpsExempt(context, pkg) && !ProtectionFilter.isMediaOrAudioApp(context, pkg)) {
                         CommandExecutor.executeCommand(context, "cmd appops set $pkg RUN_IN_BACKGROUND ignore")
                         CommandExecutor.executeCommand(context, "cmd appops set $pkg WAKE_LOCK ignore")
                         CommandExecutor.executeCommand(context, "cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")

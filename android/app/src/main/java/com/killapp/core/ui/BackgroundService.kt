@@ -131,10 +131,10 @@ class BackgroundService : Service() {
         }.start()
     }
 
-    private fun reKillFromWatchlist(pkg: String, mode: String) {
+    private fun reKillFromWatchlist(pkg: String, _mode: String) {
         try {
             CommandExecutor.forceStopPackage(this, pkg)
-            val isExempt = ProtectionFilter.isAppOpsExempt(this, pkg)
+            val isExempt = ProtectionFilter.isAppOpsExempt(this, pkg) || ProtectionFilter.isMediaOrAudioApp(this, pkg)
             val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
             if (prefs.getBoolean("gcmWakeupBypass", true) && !isExempt) {
                 CommandExecutor.executeCommand(this, "cmd appops set $pkg RUN_IN_BACKGROUND ignore")
@@ -169,7 +169,6 @@ class BackgroundService : Service() {
                     
                     if (ProtectionFilter.isAppOpsExempt(this, pkg)) {
                         toRemove.add(entry)
-                        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
                         Thread { ProcessKiller.resetAppOps(this, pkg) }.start()
                         continue
                     }
@@ -178,12 +177,13 @@ class BackgroundService : Service() {
                     if (now - killTime > expireMs) { toRemove.add(entry); continue }
 
                     val finerMedia = prefs.getBoolean("finerMediaDetection", false)
-                    val activeMediaPkgs = if (finerMedia) ProtectionFilter.getActiveMediaPackages(this) else setOf()
+                    val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(this)
+                    val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                    val isPlayingAudio = am.isMusicActive && ProtectionFilter.isMediaOrAudioApp(this, pkg)
+                    val isMediaApp = ProtectionFilter.isMediaOrAudioApp(this, pkg)
 
-                    if (ProtectionFilter.isMediaActiveProtected(this, pkg, finerMedia, activeMediaPkgs)) {
-                        toRemove.add(entry)
+                    if (ProtectionFilter.isMediaActiveProtected(this, pkg, finerMedia, activeMediaPkgs) || isPlayingAudio || isMediaApp) {
                         suspiciousPackages.remove(pkg)
-                        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
                         Thread { ProcessKiller.resetAppOps(this, pkg) }.start()
                         continue
                     }
@@ -211,7 +211,6 @@ class BackgroundService : Service() {
                     if (isForeground) {
                         toRemove.add(entry)
                         suspiciousPackages.remove(pkg)
-                        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
                         Thread { ProcessKiller.resetAppOps(this, pkg) }.start()
                     } else {
                         val firstDetected = suspiciousPackages[pkg]
@@ -268,13 +267,25 @@ class BackgroundService : Service() {
 
                 if (isAnyActive && isModeAlive) {
                     val targets = prefs.getStringSet("autoHibernationTargets", setOf()) ?: setOf()
+                    val watchlistSet = (prefs.getStringSet("reKillWatchlist", setOf()) ?: setOf()).map { it.substringBefore(":") }.toSet()
+                    val mediaApps = ProtectionFilter.getRunningMediaOrAudioApps(this@BackgroundService)
+                    val allTargets = targets + watchlistSet + mediaApps
                     val postponed = prefs.getStringSet("postponedPackages", setOf()) ?: setOf()
                     helper.updateDisplay(
                         enabled,
-                        targets,
+                        allTargets,
                         postponed,
                         false
                     )
+
+                    val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(this@BackgroundService)
+                    if (activeMediaPkgs.isNotEmpty()) {
+                        Thread {
+                            for (mediaPkg in activeMediaPkgs) {
+                                ProcessKiller.resetAppOps(this@BackgroundService, mediaPkg)
+                            }
+                        }.start()
+                    }
 
                     val ramCrunch = prefs.getBoolean("ramCrunchSlayer", false)
                     if (ramCrunch) {

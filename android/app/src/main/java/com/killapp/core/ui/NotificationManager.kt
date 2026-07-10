@@ -99,14 +99,13 @@ class NotificationManager(private val context: Context) {
             val pm = context.packageManager
             val finerMedia = prefs.getBoolean("finerMediaDetection", false)
             val smart = prefs.getBoolean("smartHibernation", true)
-            val activeMediaPkgs = if (finerMedia) ProtectionFilter.getActiveMediaPackages(context) else setOf()
+            val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(context)
 
             val activeTargets = autoHibernationTargets.filter { pkg ->
                 if (postponedPackages.contains(pkg)) return@filter false
-                if (AppListFetcher.isAppInactiveOrShallow(context, pkg)) return@filter false
+                val isMediaApp = ProtectionFilter.isMediaOrAudioApp(context, pkg)
                 if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia, activeMediaPkgs)) return@filter false
                 if (ProtectionFilter.isSmartProtected(context, pkg, smart)) return@filter false
-                if (ProtectionFilter.isAppOpsExempt(context, pkg)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
                     (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
@@ -117,8 +116,6 @@ class NotificationManager(private val context: Context) {
 
             val postponedRunning = autoHibernationTargets.filter { pkg ->
                 if (!postponedPackages.contains(pkg)) return@filter false
-                if (AppListFetcher.isAppInactiveOrShallow(context, pkg)) return@filter false
-                if (ProtectionFilter.isAppOpsExempt(context, pkg)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
                     (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
@@ -210,7 +207,7 @@ class NotificationManager(private val context: Context) {
                     .addAction(actionPostpone)
                     .addAction(actionFreeze)
                     .setOngoing(true)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && activeTargets.size >= 2) {
                     childBuilder.setGroup(groupKey)
                 }
                 try {

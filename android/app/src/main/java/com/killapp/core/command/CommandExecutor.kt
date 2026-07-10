@@ -4,6 +4,65 @@ import android.content.Context
 import android.content.pm.PackageManager
 import rikka.shizuku.Shizuku
 
+object RootShell {
+    private var process: Process? = null
+    private var writer: java.io.BufferedWriter? = null
+    private var reader: java.io.BufferedReader? = null
+
+    @Synchronized
+    private fun ensureShell(): Boolean {
+        try {
+            if (process != null) {
+                try {
+                    process!!.exitValue()
+                    close()
+                } catch (e: IllegalThreadStateException) {
+                    return true
+                }
+            }
+            val p = Runtime.getRuntime().exec("su")
+            writer = java.io.BufferedWriter(java.io.OutputStreamWriter(p.outputStream))
+            reader = java.io.BufferedReader(java.io.InputStreamReader(p.inputStream))
+            process = p
+            return true
+        } catch (e: Exception) {
+            close()
+            return false
+        }
+    }
+
+    @Synchronized
+    fun execute(command: String): String {
+        if (!ensureShell()) return ""
+        return try {
+            val endMarker = "__ROOT_CMD_END_${System.nanoTime()}__"
+            writer!!.write("$command 2>&1\necho $endMarker\n")
+            writer!!.flush()
+
+            val sb = StringBuilder()
+            var line: String?
+            while (reader!!.readLine().also { line = it } != null) {
+                if (line == endMarker) break
+                sb.append(line).append("\n")
+            }
+            sb.toString()
+        } catch (e: Exception) {
+            close()
+            ""
+        }
+    }
+
+    @Synchronized
+    fun close() {
+        try { writer?.close() } catch (e: Exception) {}
+        try { reader?.close() } catch (e: Exception) {}
+        try { process?.destroy() } catch (e: Exception) {}
+        writer = null
+        reader = null
+        process = null
+    }
+}
+
 object CommandExecutor {
 
     fun isShizukuReady(): Boolean {
@@ -24,8 +83,8 @@ object CommandExecutor {
         
         return try {
             if (mode == "root") {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                process.waitFor()
+                val output = RootShell.execute("$command; echo __KILLAPP_CODE_\$?__")
+                if (output.contains("__KILLAPP_CODE_0__")) 0 else -1
             } else {
                 if (!isShizukuReady()) return -1
                 val clazz = Class.forName("rikka.shizuku.Shizuku")
@@ -43,24 +102,24 @@ object CommandExecutor {
         val mode = getWorkingMode(context)
         
         return try {
-            val process = if (mode == "root") {
-                Runtime.getRuntime().exec(arrayOf("su", "-c", "$command 2>&1"))
+            if (mode == "root") {
+                RootShell.execute(command)
             } else {
                 if (!isShizukuReady()) return ""
                 val clazz = Class.forName("rikka.shizuku.Shizuku")
                 val method = clazz.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
                 method.isAccessible = true
-                method.invoke(null, arrayOf("sh", "-c", "$command 2>&1"), null, null) as Process
+                val process = method.invoke(null, arrayOf("sh", "-c", "$command 2>&1"), null, null) as Process
+                
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+                val output = java.lang.StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    output.append(line).append("\n")
+                }
+                process.waitFor()
+                output.toString()
             }
-            
-            val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
-            val output = java.lang.StringBuilder()
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                output.append(line).append("\n")
-            }
-            process.waitFor()
-            output.toString()
         } catch (e: Exception) {
             ""
         }

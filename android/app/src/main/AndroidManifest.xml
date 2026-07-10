@@ -38,6 +38,10 @@
         </intent-filter>
       </activity>
       <service
+        android:name=".core.ui.BackgroundService"
+        android:exported="false"
+        android:foregroundServiceType="specialUse" />
+      <service
         android:name=".service.KillerForegroundService"
         android:exported="false"
         android:foregroundServiceType="specialUse" />
