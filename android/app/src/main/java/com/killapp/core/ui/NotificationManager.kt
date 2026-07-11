@@ -25,12 +25,16 @@ class NotificationManager(private val context: Context) {
 
     fun cancelAllNotifications() {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        for (id in activeNotifIds) {
-            nm.cancel(id)
+        try {
+            nm.cancelAll()
+        } catch (e: Exception) {
+            for (id in activeNotifIds) {
+                nm.cancel(id)
+            }
+            nm.cancel(888)
+            nm.cancel(999)
         }
         activeNotifIds.clear()
-        nm.cancel(888)
-        nm.cancel(999)
         lastActiveTargetsString = "-1"
         lastEnabledState = false
     }
@@ -51,12 +55,7 @@ class NotificationManager(private val context: Context) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-            val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-            val isModeAlive = if (mode == "root") {
-                prefs.getBoolean("isRootActive", false)
-            } else {
-                CommandExecutor.isShizukuReady()
-            }
+            val isModeAlive = CommandExecutor.isReady(context)
 
             if (!quickActionNotifEnabled || !isModeAlive) {
                 if (lastEnabledState != false || force) {
@@ -99,16 +98,17 @@ class NotificationManager(private val context: Context) {
             val pm = context.packageManager
             val finerMedia = prefs.getBoolean("finerMediaDetection", false)
             val smart = prefs.getBoolean("smartHibernation", true)
-            val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(context)
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val runningProcesses = am.runningAppProcesses ?: emptyList()
 
             val activeTargets = autoHibernationTargets.filter { pkg ->
                 if (postponedPackages.contains(pkg)) return@filter false
-                val isMediaApp = ProtectionFilter.isMediaOrAudioApp(context, pkg)
-                if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia, activeMediaPkgs)) return@filter false
+                if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia)) return@filter false
                 if (ProtectionFilter.isSmartProtected(context, pkg, smart)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
-                    (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
+                    val isStopped = (info.flags and ApplicationInfo.FLAG_STOPPED) != 0
+                    !isStopped && !AppListFetcher.isAppInactiveOrShallow(context, pkg, runningProcesses)
                 } catch (e: Exception) {
                     false
                 }
@@ -118,7 +118,8 @@ class NotificationManager(private val context: Context) {
                 if (!postponedPackages.contains(pkg)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
-                    (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
+                    val isStopped = (info.flags and ApplicationInfo.FLAG_STOPPED) != 0
+                    !isStopped && !AppListFetcher.isAppInactiveOrShallow(context, pkg, runningProcesses)
                 } catch (e: Exception) {
                     false
                 }
@@ -131,8 +132,19 @@ class NotificationManager(private val context: Context) {
             lastActiveTargetsString = currentTargetsString
 
             notificationManager.cancel(999)
-            for (oldId in activeNotifIds) {
-                notificationManager.cancel(oldId)
+            if (activeNotifIds.isEmpty() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                try {
+                    val activeNotifs = notificationManager.activeNotifications
+                    for (notif in activeNotifs) {
+                        if (notif.id != 888) {
+                            notificationManager.cancel(notif.id)
+                        }
+                    }
+                } catch (e: Exception) {}
+            } else {
+                for (oldId in activeNotifIds) {
+                    notificationManager.cancel(oldId)
+                }
             }
             activeNotifIds.clear()
 

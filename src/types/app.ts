@@ -5,6 +5,7 @@ export interface AppInfo {
 	isSystemApp: boolean;
 	isGcm?: boolean;
 	isStopped?: boolean;
+	isMediaApp?: boolean;
 	isSelected?: boolean;
 }
 

@@ -21,11 +21,7 @@ import { InfoModal } from "../components/modals/InfoModal";
 import { QuickKillModal } from "../components/modals/QuickKillModal";
 import { SettingsModal } from "../components/modals/SettingsModal";
 import { useTheme } from "../hooks/useTheme";
-import {
-	CRITICAL_PACKAGES,
-	killerService,
-	MEDIA_PACKAGES,
-} from "../services/killer";
+import { CRITICAL_PACKAGES, killerService } from "../services/killer";
 import { useAppStore } from "../stores/useAppStore";
 
 export const HomeScreen: React.FC = () => {
@@ -358,8 +354,7 @@ export const HomeScreen: React.FC = () => {
 											CRITICAL_PACKAGES.has(app.packageName),
 									)}
 									isMediaApp={Boolean(
-										settings?.finerMediaDetection &&
-											MEDIA_PACKAGES.has(app.packageName),
+										settings?.finerMediaDetection && app.isMediaApp,
 									)}
 								/>
 							);

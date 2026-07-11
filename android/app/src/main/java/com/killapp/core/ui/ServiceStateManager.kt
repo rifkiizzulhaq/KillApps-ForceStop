@@ -40,8 +40,8 @@ class ServiceStateManager(private val context: ReactApplicationContext) {
         val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putBoolean("autoHibernationEnabled", autoHibernationEnabled)
-            .putStringSet("autoHibernationTargets", autoHibernationTargets)
-            .putStringSet("postponedPackages", postponedPackages)
+            .putStringSet("autoHibernationTargets", java.util.HashSet(autoHibernationTargets))
+            .putStringSet("postponedPackages", java.util.HashSet(postponedPackages))
             .apply()
 
         if (enabled) {
@@ -51,8 +51,22 @@ class ServiceStateManager(private val context: ReactApplicationContext) {
             } else {
                 context.startService(serviceIntent)
             }
+            updateNotificationDisplay()
+        } else {
+            val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            val isAnyActive = prefs.getBoolean("quickActionNotifEnabled", quickActionNotifEnabled) ||
+                prefs.getBoolean("bedtimeShield", false) ||
+                prefs.getBoolean("emergencyTrigger", false) ||
+                prefs.getBoolean("ramCrunchSlayer", false) ||
+                prefs.getInt("autoKillScheduler", 0) > 0
+            val serviceIntent = Intent(context, BackgroundService::class.java)
+            if (!isAnyActive) {
+                context.stopService(serviceIntent)
+                notificationManager.cancelAllNotifications()
+            } else {
+                updateNotificationDisplay(true)
+            }
         }
-        updateNotificationDisplay()
     }
 
     fun setQuickActionNotification(enabled: Boolean) {

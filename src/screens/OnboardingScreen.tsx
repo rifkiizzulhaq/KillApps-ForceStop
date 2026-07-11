@@ -112,11 +112,8 @@ export const OnboardingScreen: React.FC = () => {
 	const prevStep = useRef(step);
 
 	useEffect(() => {
-		if (step === 3 && prevStep.current !== 3) {
-			startVerification(settings.workingMode);
-		}
 		prevStep.current = step;
-	}, [step, settings.workingMode, startVerification]);
+	}, [step]);
 
 	const allPermsGranted = notifGranted;
 	const isNextActive = step !== 2 || allPermsGranted;

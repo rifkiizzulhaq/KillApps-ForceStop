@@ -51,7 +51,9 @@ export const WorkingModeModal: React.FC<Props> = ({ visible, onClose }) => {
 					} else {
 						await useAppStore.getState().checkWorkingModeStatus();
 						const state = useAppStore.getState();
-						if (state.isShizukuActive && !state.isPermissionGranted) {
+						if (!state.isShizukuActive) {
+							setShizukuInfoModal(true);
+						} else if (!state.isPermissionGranted) {
 							setTimeout(async () => {
 								await useAppStore.getState().requestShizukuPermission();
 								const newState = useAppStore.getState();

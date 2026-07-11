@@ -53,8 +53,10 @@ object ProcessKiller {
         try {
             val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
             val set = (prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()).toMutableSet()
-            set.add(pkg)
-            prefs.edit().putStringSet("shallow_killed_set", set).apply()
+            val cleanSet = set.filter { !it.equals(pkg) && !it.startsWith("$pkg:") }.toMutableSet()
+            val now = System.currentTimeMillis()
+            cleanSet.add("$pkg:$now")
+            prefs.edit().putStringSet("shallow_killed_set", cleanSet).apply()
         } catch (e: Exception) {}
     }
 
@@ -78,7 +80,6 @@ object ProcessKiller {
         val dontRemoveNotif = prefs.getBoolean("dontRemoveNotif", false)
         val phantomSlayer = prefs.getBoolean("phantomSlayer", false)
 
-        val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(context)
 
         for (i in 0 until packageNames.size()) {
             val pkg = packageNames.getString(i)
@@ -87,8 +88,8 @@ object ProcessKiller {
                     webviewSkippedList.pushString(pkg)
                     continue
                 }
-                if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia, activeMediaPkgs) || 
-                    ProtectionFilter.isSmartProtected(context, pkg, smart) || 
+                if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia) ||
+                    ProtectionFilter.isSmartProtected(context, pkg, smart) ||
                     ProtectionFilter.isQuarantineProtected(context, pkg)) {
                     Thread { resetAppOps(context, pkg) }.start()
                     failedList.pushString(pkg)

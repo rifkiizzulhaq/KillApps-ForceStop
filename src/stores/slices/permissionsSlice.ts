@@ -19,6 +19,13 @@ export const createPermissionsSlice: StateCreator<
 		if (mode === "root") {
 			const isRoot = await killerService.checkRootAccess();
 			set({ isRootActive: isRoot });
+			if (isRoot) {
+				if (get().apps.length === 0) {
+					await get().fetchApps(false);
+				} else {
+					get().fetchApps(true);
+				}
+			}
 			return isRoot;
 		}
 
@@ -37,8 +44,12 @@ export const createPermissionsSlice: StateCreator<
 			}, 400);
 		}
 
-		if (get().apps.length === 0) {
-			await get().fetchApps(false);
+		if (isBinder && isPerm) {
+			if (get().apps.length === 0) {
+				await get().fetchApps(false);
+			} else {
+				get().fetchApps(true);
+			}
 		}
 
 		return isBinder && isPerm;
@@ -52,8 +63,12 @@ export const createPermissionsSlice: StateCreator<
 			isShizukuActive: isBinder,
 			isPermissionGranted: isPerm,
 		});
-		if (get().apps.length === 0) {
-			await get().fetchApps(false);
+		if (isBinder && isPerm) {
+			if (get().apps.length === 0) {
+				await get().fetchApps(false);
+			} else {
+				get().fetchApps(true);
+			}
 		}
 	},
 
@@ -72,6 +87,13 @@ export const createPermissionsSlice: StateCreator<
 	checkRootStatus: async () => {
 		const isRoot = await killerService.checkRootAccess();
 		set({ isRootActive: isRoot });
+		if (isRoot) {
+			if (get().apps.length === 0) {
+				await get().fetchApps(false);
+			} else {
+				get().fetchApps(true);
+			}
+		}
 		return isRoot;
 	},
 });

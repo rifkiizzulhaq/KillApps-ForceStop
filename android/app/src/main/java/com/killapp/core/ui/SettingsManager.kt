@@ -73,6 +73,39 @@ object SettingsManager {
         }
     }
 
+    fun clearAllData(context: Context) {
+        com.killapp.core.command.RootShell.close()
+        val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+
+        prefs.edit()
+            .putString("workingMode", "shizuku")
+            .putBoolean("smartHibernation", true)
+            .putBoolean("finerMediaDetection", false)
+            .putBoolean("shallowHibernation", false)
+            .putBoolean("wakeUpTracking", true)
+            .putBoolean("dontRemoveNotif", false)
+            .putBoolean("ignoreBackgroundFree", true)
+            .putBoolean("aggressiveDoze", false)
+            .putBoolean("gcmWakeupBypass", true)
+            .putBoolean("deepTrimMemory", false)
+            .putBoolean("phantomSlayer", false)
+            .putBoolean("bedtimeShield", false)
+            .putBoolean("emergencyTrigger", false)
+            .putBoolean("ramCrunchSlayer", false)
+            .putInt("autoKillScheduler", 0)
+            .putInt("bedtimeStart", 1380)
+            .putInt("bedtimeEnd", 300)
+            .putBoolean("quickActionNotifEnabled", false)
+            .putBoolean("autoHibernationEnabled", false)
+            .apply()
+
+        // Hentikan BackgroundService karena semua fitur otomatis dimatikan
+        try {
+            context.stopService(Intent(context, BackgroundService::class.java))
+        } catch (e: Exception) {}
+    }
+
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager

@@ -56,10 +56,7 @@ class CoreKillerService {
 
 export const killerService = new CoreKillerService();
 
-let _currentMode: KillerMode = "shizuku";
-
 export const setKillerMode = (mode: KillerMode): void => {
-	_currentMode = mode;
 	/* istanbul ignore next */ if (NativeKiller?.setWorkingMode) {
 		NativeKiller.setWorkingMode(mode);
 	}
@@ -123,6 +120,12 @@ export const setProOptions = (options: {
 	}
 };
 
+export const clearAllNativeData = (): void => {
+	/* istanbul ignore next */ if (NativeKiller?.clearAllData) {
+		NativeKiller.clearAllData();
+	}
+};
+
 export const freezeQuarantinePackage = async (
 	pkg: string,
 	freeze: boolean,
@@ -178,17 +181,5 @@ export const CRITICAL_PACKAGES = new Set<string>(
 		"com.android.vending",
 		"com.google.android.webview",
 		"com.android.webview",
-	],
-);
-
-export const MEDIA_PACKAGES = new Set<string>(
-	NativeKiller?.getConstants().MEDIA_PACKAGES ?? [
-		"com.spotify.music",
-		"com.google.android.apps.youtube.music",
-		"com.apple.android.music",
-		"com.tencent.ibg.joox",
-		"com.deezer.android.app",
-		"com.soundcloud.android",
-		"com.google.android.videos",
 	],
 );

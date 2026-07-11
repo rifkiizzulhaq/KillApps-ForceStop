@@ -58,7 +58,11 @@ class BackgroundService : Service() {
                 }
             }
         }
-        registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        }
 
         batteryReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -91,7 +95,11 @@ class BackgroundService : Service() {
                 }
             }
         }
-        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -108,6 +116,8 @@ class BackgroundService : Service() {
             try {
                 val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
                 val ignoreBackgroundFree = prefs.getBoolean("ignoreBackgroundFree", false)
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val runningProcesses = am.runningAppProcesses ?: emptyList()
                 val array = com.facebook.react.bridge.Arguments.createArray()
                 for (pkg in targets) {
                     if (ignoreBackgroundFree) {
@@ -115,7 +125,7 @@ class BackgroundService : Service() {
                             val info = packageManager.getApplicationInfo(pkg, 0)
                             (info.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0
                         } catch (e: Exception) { false }
-                        if (!alreadyStopped && !AppListFetcher.isAppInactiveOrShallow(this, pkg)) {
+                        if (!alreadyStopped && !AppListFetcher.isAppInactiveOrShallow(this, pkg, runningProcesses)) {
                             array.pushString(pkg)
                         }
                     } else {
@@ -131,15 +141,20 @@ class BackgroundService : Service() {
         }.start()
     }
 
-    private fun reKillFromWatchlist(pkg: String, _mode: String) {
+    private fun reKillFromWatchlist(pkg: String) {
         try {
-            CommandExecutor.forceStopPackage(this, pkg)
-            val isExempt = ProtectionFilter.isAppOpsExempt(this, pkg) || ProtectionFilter.isMediaOrAudioApp(this, pkg)
             val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-            if (prefs.getBoolean("gcmWakeupBypass", true) && !isExempt) {
+            val useShallow = prefs.getBoolean("shallowHibernation", false) || prefs.getBoolean("dontRemoveNotif", false)
+            if (useShallow) {
+                CommandExecutor.executeCommand(this, "am set-inactive $pkg true")
+            } else {
+                CommandExecutor.forceStopPackage(this, pkg)
+            }
+            val isExempt = ProtectionFilter.isAppOpsExempt(this, pkg) || ProtectionFilter.isMediaOrAudioApp(this, pkg)
+            if (prefs.getBoolean("gcmWakeupBypass", true) && !isExempt && !useShallow) {
                 CommandExecutor.executeCommand(this, "cmd appops set $pkg RUN_IN_BACKGROUND ignore")
             }
-            if (prefs.getBoolean("wakeUpTracking", true) && !isExempt) {
+            if (prefs.getBoolean("wakeUpTracking", true) && !isExempt && !useShallow) {
                 CommandExecutor.executeCommand(this, "cmd appops set $pkg WAKE_LOCK ignore")
             }
         } catch (e: Exception) {}
@@ -161,6 +176,8 @@ class BackgroundService : Service() {
                 val expireMs = 60 * 60 * 1000L 
                 val toRemove = mutableSetOf<String>()
                 val toReKill = mutableListOf<String>()
+                val actMgr = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val runningProcesses = actMgr.runningAppProcesses ?: emptyList()
 
                 for (entry in watchlist) {
                     val colonIdx = entry.lastIndexOf(':')
@@ -177,12 +194,8 @@ class BackgroundService : Service() {
                     if (now - killTime > expireMs) { toRemove.add(entry); continue }
 
                     val finerMedia = prefs.getBoolean("finerMediaDetection", false)
-                    val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(this)
-                    val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-                    val isPlayingAudio = am.isMusicActive && ProtectionFilter.isMediaOrAudioApp(this, pkg)
-                    val isMediaApp = ProtectionFilter.isMediaOrAudioApp(this, pkg)
 
-                    if (ProtectionFilter.isMediaActiveProtected(this, pkg, finerMedia, activeMediaPkgs) || isPlayingAudio || isMediaApp) {
+                    if (ProtectionFilter.isMediaActiveProtected(this, pkg, finerMedia)) {
                         suspiciousPackages.remove(pkg)
                         Thread { ProcessKiller.resetAppOps(this, pkg) }.start()
                         continue
@@ -192,20 +205,28 @@ class BackgroundService : Service() {
                         val info = packageManager.getApplicationInfo(pkg, 0)
                         (info.flags and android.content.pm.ApplicationInfo.FLAG_STOPPED) != 0
                     } catch (e: Exception) { true }
-                    val isStopped = isStoppedFlag || AppListFetcher.isAppInactiveOrShallow(this, pkg)
+                    val isStopped = isStoppedFlag || AppListFetcher.isAppInactiveOrShallow(this, pkg, runningProcesses)
 
                     if (isStopped) {
                         suspiciousPackages.remove(pkg)
                         continue
                     }
 
-                    val isForeground = try { 
-                        val resumedOutput = CommandExecutor.executeCommandWithOutput(this, "dumpsys activity activities | grep mResumedActivity")
-                        val pausedOutput = CommandExecutor.executeCommandWithOutput(this, "dumpsys activity activities | grep mLastPausedActivity")
-                        val isF = resumedOutput.contains(pkg) || pausedOutput.contains(pkg)
-                        isF
-                    } catch (e: Exception) { 
-                        false 
+                    val isForeground = try {
+                        val isAmForeground = runningProcesses.any { it.pkgList.contains(pkg) && it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND }
+                        if (isAmForeground) {
+                            true
+                        } else {
+                            val resumedOutput = CommandExecutor.executeCommandWithOutput(this, "dumpsys activity activities | grep -iE 'mResumedActivity|topResumedActivity|ResumedActivity|mLastPausedActivity'")
+                            if (resumedOutput.contains(pkg)) {
+                                true
+                            } else {
+                                val topOutput = CommandExecutor.executeCommandWithOutput(this, "dumpsys activity top | head -n 25")
+                                topOutput.contains(pkg)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        false
                     }
                     
                     if (isForeground) {
@@ -231,8 +252,7 @@ class BackgroundService : Service() {
                 }
 
                 if (toReKill.isNotEmpty()) {
-                    val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-                    toReKill.forEach { reKillFromWatchlist(it, mode) }
+                    toReKill.forEach { reKillFromWatchlist(it) }
                 }
             } catch (e: Exception) {}
             finally {
@@ -247,14 +267,7 @@ class BackgroundService : Service() {
             override fun run() {
                 val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
                 val enabled = prefs.getBoolean("quickActionNotifEnabled", false)
-                val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-                val isModeAlive = if (mode == "root") {
-                    prefs.getBoolean("isRootActive", false)
-                } else {
-                    try {
-                        rikka.shizuku.Shizuku.pingBinder() && rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
-                    } catch (e: Exception) { false }
-                }
+                val isModeAlive = CommandExecutor.isReady(this@BackgroundService)
 
                 val isWatchlistActive = ProcessKiller.isReKillWatchlistEnabled(this@BackgroundService) && prefs.getBoolean("reKillWatchlistActive", false)
                 val isAnyActive = enabled ||
@@ -267,9 +280,7 @@ class BackgroundService : Service() {
 
                 if (isAnyActive && isModeAlive) {
                     val targets = prefs.getStringSet("autoHibernationTargets", setOf()) ?: setOf()
-                    val watchlistSet = (prefs.getStringSet("reKillWatchlist", setOf()) ?: setOf()).map { it.substringBefore(":") }.toSet()
-                    val mediaApps = ProtectionFilter.getRunningMediaOrAudioApps(this@BackgroundService)
-                    val allTargets = targets + watchlistSet + mediaApps
+                    val allTargets = targets
                     val postponed = prefs.getStringSet("postponedPackages", setOf()) ?: setOf()
                     helper.updateDisplay(
                         enabled,

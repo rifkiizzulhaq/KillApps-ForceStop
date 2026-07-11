@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import {
+	clearAllNativeData,
 	killerService,
 	setGeekOptions,
 	setHibernationOptions,
@@ -73,7 +74,7 @@ export const createSettingsSlice: StateCreator<
 				newSettings.shallowHibernation ?? false,
 				newSettings.wakeUpTracking ?? true,
 				newSettings.dontRemoveNotif ?? false,
-				newSettings.ignoreBackgroundFree ?? false,
+				newSettings.ignoreBackgroundFree ?? true,
 			);
 			setProOptions({
 				phantomSlayer: newSettings.phantomSlayer ?? false,
@@ -118,7 +119,7 @@ export const createSettingsSlice: StateCreator<
 					state.settings?.shallowHibernation ?? false,
 					state.settings?.wakeUpTracking ?? true,
 					state.settings?.dontRemoveNotif ?? false,
-					state.settings?.ignoreBackgroundFree ?? false,
+					state.settings?.ignoreBackgroundFree ?? true,
 				);
 				setProOptions({
 					phantomSlayer: state.settings?.phantomSlayer ?? false,
@@ -135,26 +136,18 @@ export const createSettingsSlice: StateCreator<
 	},
 	completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 	resetOnboarding: () => {
-		killerService.setQuickActionNotification(false);
-		killerService.setAutoHibernationConfig(false, []);
+		clearAllNativeData();
 		setKillerMode("shizuku");
-		setGeekOptions(false, true, false);
-		setHibernationOptions(true, false, false, true, false, true);
-		setProOptions({
-			phantomSlayer: false,
-			bedtimeShield: false,
-			emergencyTrigger: false,
-			ramCrunchSlayer: false,
-			autoKillScheduler: 0,
-			bedtimeStart: 1380,
-			bedtimeEnd: 300,
-		});
-		set((state) => ({
+		set({
 			hasCompletedOnboarding: false,
 			currentScreen: "home",
+			settingsScrollY: 0,
 			showSystemApps: false,
 			hibernationList: [],
-			apps: state.apps.map((app) => ({ ...app, isSelected: false })),
+			apps: [],
+			isRootActive: false,
+			isShizukuActive: false,
+			isPermissionGranted: false,
 			settings: {
 				workingMode: "shizuku",
 				smartHibernation: true,
@@ -179,6 +172,6 @@ export const createSettingsSlice: StateCreator<
 				bedtimeStart: 1380,
 				bedtimeEnd: 300,
 			},
-		}));
+		});
 	},
 });

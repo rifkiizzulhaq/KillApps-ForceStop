@@ -57,30 +57,47 @@ object ForensicAnalyzer {
     fun getResurrectionReport(context: Context): WritableArray {
         val array = Arguments.createArray()
         val pm = context.packageManager
+        val countMap = mutableMapOf<String, Int>()
+        val now = System.currentTimeMillis()
+        val oneDayMs = 24 * 60 * 60 * 1000L
 
         try {
-            val output = CommandExecutor.executeCommandWithOutput(context, "dumpsys activity exit-info")
-            val countMap = mutableMapOf<String, Int>()
-            var currentPkg = ""
-            
-            val lines = output.split("\n")
-            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
-            val now = System.currentTimeMillis()
-            val oneDayMs = 24 * 60 * 60 * 1000L
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val exitReasons = am.getHistoricalProcessExitReasons(null, 0, 0)
+                for (info in exitReasons) {
+                    val pkg = try {
+                        val getPkgList = info.javaClass.getMethod("getPackageList")
+                        val list = getPkgList.invoke(info) as? Array<String>
+                        list?.firstOrNull()
+                    } catch (e: Exception) { null } ?: info.processName?.substringBefore(":")
 
-            for (line in lines) {
-                val trimmed = line.trim()
-                if (trimmed.startsWith("package: ")) {
-                    currentPkg = trimmed.substringAfter("package: ").trim()
-                } else if (trimmed.startsWith("timestamp=")) {
-                    if (currentPkg.isNotEmpty() && currentPkg != context.packageName) {
-                        try {
-                            val timeStr = trimmed.substringAfter("timestamp=").substringBefore(" pid=")
-                            val date = sdf.parse(timeStr)
-                            if (date != null && now - date.time <= oneDayMs) {
-                                countMap[currentPkg] = (countMap[currentPkg] ?: 0) + 1
-                            }
-                        } catch (e: Exception) {}
+                    if (!pkg.isNullOrEmpty() && pkg != context.packageName) {
+                        if (now - info.timestamp <= oneDayMs) {
+                            countMap[pkg] = (countMap[pkg] ?: 0) + 1
+                        }
+                    }
+                }
+            } else {
+                val output = CommandExecutor.executeCommandWithOutput(context, "dumpsys activity exit-info")
+                var currentPkg = ""
+                val lines = output.split("\n")
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
+
+                for (line in lines) {
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("package: ")) {
+                        currentPkg = trimmed.substringAfter("package: ").trim()
+                    } else if (trimmed.startsWith("timestamp=")) {
+                        if (currentPkg.isNotEmpty() && currentPkg != context.packageName) {
+                            try {
+                                val timeStr = trimmed.substringAfter("timestamp=").substringBefore(" pid=")
+                                val date = sdf.parse(timeStr)
+                                if (date != null && now - date.time <= oneDayMs) {
+                                    countMap[currentPkg] = (countMap[currentPkg] ?: 0) + 1
+                                }
+                            } catch (e: Exception) {}
+                        }
                     }
                 }
             }

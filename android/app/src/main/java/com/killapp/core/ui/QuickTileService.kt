@@ -6,6 +6,7 @@ import android.service.quicksettings.TileService
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import com.facebook.react.bridge.Arguments
+import com.killapp.core.command.CommandExecutor
 import com.killapp.core.execution.ProcessKiller
 
 @RequiresApi(Build.VERSION_CODES.N)
@@ -32,15 +33,11 @@ class QuickTileService : TileService() {
 
         Thread {
             try {
-                val mode = prefs.getString("workingMode", "shizuku")
-                if (mode == "root") {
+                if (CommandExecutor.isReady(this)) {
                     ProcessKiller.killApps(this, array)
-                } else {
-                    ProcessKiller.killApps(this, array)
+                    updateTileState()
                 }
-                updateTileState()
-            } catch (e: Exception) {
-            }
+            } catch (e: Exception) {}
         }.start()
 
         Toast.makeText(this, "KillApps: Mengeksekusi ${targets.size} aplikasi...", Toast.LENGTH_SHORT).show()

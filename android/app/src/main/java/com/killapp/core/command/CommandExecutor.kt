@@ -65,11 +65,51 @@ object RootShell {
 
 object CommandExecutor {
 
-    fun isShizukuReady(): Boolean {
+    fun isShizukuBinderAlive(): Boolean {
         return try {
-            Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            Shizuku.pingBinder()
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun isShizukuPermissionGranted(): Boolean {
+        return try {
+            isShizukuBinderAlive() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun isShizukuReady(): Boolean {
+        return isShizukuPermissionGranted()
+    }
+
+    fun checkRootAccess(context: Context): Boolean {
+        return try {
+            val isRoot = RootShell.execute("id").contains("uid=0")
+            val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("isRootActive", isRoot).apply()
+            isRoot
+        } catch (e: Exception) {
+            val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("isRootActive", false).apply()
+            false
+        }
+    }
+
+    fun isReady(context: Context): Boolean {
+        val mode = getWorkingMode(context)
+        return if (mode == "root") {
+            val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+            val cachedRoot = prefs.getBoolean("isRootActive", false)
+            if (cachedRoot) {
+                true
+            } else {
+                checkRootAccess(context)
+            }
+        } else {
+            isShizukuReady()
         }
     }
 

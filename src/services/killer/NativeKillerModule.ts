@@ -11,7 +11,6 @@ const { CoreKillerModule } = NativeModules;
 export interface ICoreKillerModule {
 	getConstants: () => {
 		CRITICAL_PACKAGES: string[];
-		MEDIA_PACKAGES: string[];
 	};
 	checkBinder(): Promise<boolean>;
 	checkPermission(): Promise<boolean>;
@@ -39,6 +38,7 @@ export interface ICoreKillerModule {
 	isIgnoringBatteryOptimizations(): Promise<boolean>;
 	requestIgnoreBatteryOptimizations(): Promise<boolean>;
 	setProOptions(options: Record<string, unknown>): void;
+	clearAllData(): void;
 	freezeQuarantinePackage(
 		pkg: string,
 		freeze: boolean,

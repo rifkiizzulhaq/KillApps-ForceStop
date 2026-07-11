@@ -48,10 +48,6 @@ class CoreKillerModule(reactContext: ReactApplicationContext) : ReactContextBase
         com.killapp.core.execution.ProtectionFilter.criticalPackages.forEach { criticalArray.pushString(it) }
         constants["CRITICAL_PACKAGES"] = criticalArray
 
-        val mediaArray = com.facebook.react.bridge.Arguments.createArray()
-        com.killapp.core.execution.ProtectionFilter.mediaPackages.forEach { mediaArray.pushString(it) }
-        constants["MEDIA_PACKAGES"] = mediaArray
-
         return constants
     }
 
@@ -77,37 +73,28 @@ class CoreKillerModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     @ReactMethod
+    fun clearAllData() {
+        com.killapp.core.ui.SettingsManager.clearAllData(reactApplicationContext)
+    }
+
+    @ReactMethod
     fun checkBinder(promise: Promise) {
-        try {
-            val isBinderAlive = Shizuku.pingBinder()
-            promise.resolve(isBinderAlive)
-        } catch (e: Exception) {
-            promise.resolve(false)
-        }
+        promise.resolve(CommandExecutor.isShizukuBinderAlive())
     }
 
     @ReactMethod
     fun checkPermission(promise: Promise) {
-        try {
-            if (!Shizuku.pingBinder()) {
-                promise.resolve(false)
-                return
-            }
-            val isGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-            promise.resolve(isGranted)
-        } catch (e: Exception) {
-            promise.resolve(false)
-        }
+        promise.resolve(CommandExecutor.isShizukuPermissionGranted())
     }
 
     @ReactMethod
     fun requestPermission(promise: Promise) {
         try {
-            if (!Shizuku.pingBinder()) {
+            if (!CommandExecutor.isShizukuBinderAlive()) {
                 promise.reject("SHIZUKU_NOT_RUNNING", "Shizuku binder is not running")
                 return
             }
-            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            if (CommandExecutor.isShizukuPermissionGranted()) {
                 promise.resolve(true)
                 return
             }
@@ -130,15 +117,9 @@ class CoreKillerModule(reactContext: ReactApplicationContext) : ReactContextBase
     fun checkRootAccess(promise: Promise) {
         Thread {
             try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-                val exitCode = process.waitFor()
-                val isRoot = (exitCode == 0)
-                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                prefs.edit().putBoolean("isRootActive", isRoot).apply()
+                val isRoot = CommandExecutor.checkRootAccess(reactApplicationContext)
                 promise.resolve(isRoot)
             } catch (e: Exception) {
-                val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                prefs.edit().putBoolean("isRootActive", false).apply()
                 promise.resolve(false)
             }
         }.start()
@@ -191,11 +172,8 @@ class CoreKillerModule(reactContext: ReactApplicationContext) : ReactContextBase
     @ReactMethod
     fun killApps(packageNames: ReadableArray, promise: Promise) {
         try {
-            val prefs = reactApplicationContext.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-            val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-            
-            if (mode != "root" && !CommandExecutor.isShizukuReady()) {
-                promise.reject("PERMISSION_DENIED", "Shizuku is not running or permission denied")
+            if (!CommandExecutor.isReady(reactApplicationContext)) {
+                promise.reject("PERMISSION_DENIED", "Mode tidak aktif atau permission belum diberikan")
                 return
             }
             val resultMap = ProcessKiller.killApps(reactApplicationContext, packageNames)

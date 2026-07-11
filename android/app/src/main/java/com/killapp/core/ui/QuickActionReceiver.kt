@@ -24,34 +24,40 @@ class QuickActionReceiver(
         when (action) {
             "com.killapp.ACTION_FREEZE_ALL" -> {
                 postponedPackages.clear()
-                prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
+                prefs.edit().putStringSet("postponedPackages", java.util.HashSet(postponedPackages)).apply()
                 notificationManager.cancelAllNotifications()
                 
                 Thread {
                     try {
-                        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-                        val isReady = if (mode == "root") true else CommandExecutor.isShizukuReady()
+                        val isReady = CommandExecutor.isReady(reactContext)
                         if (isReady) {
-                            var count = 0
+                            val array = com.facebook.react.bridge.Arguments.createArray()
                             val pm = reactContext.packageManager
                             for (pkg in autoHibernationTargets) {
                                 val isRunning = try {
                                     val info = pm.getApplicationInfo(pkg, 0)
                                     (info.flags and ApplicationInfo.FLAG_STOPPED) == 0
                                 } catch (e: Exception) { false }
-                                if (isRunning && (CommandExecutor.executeCommand(reactContext, "am force-stop $pkg") == 0)) {
-                                    count++
+                                if (isRunning) {
+                                    array.pushString(pkg)
                                 }
                             }
-                            Thread.sleep(700)
-                            Handler(Looper.getMainLooper()).post {
-                                Toast.makeText(reactContext, "$count aplikasi berhasil di-kill!", Toast.LENGTH_SHORT).show()
-                                try {
-                                    reactContext
-                                        .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                                        .emit("onAppsFrozen", null)
-                                } catch (e: Exception) {}
-                                updateDisplay()
+                            
+                            if (array.size() > 0) {
+                                val result = com.killapp.core.execution.ProcessKiller.killApps(reactContext, array)
+                                val killedCount = try { result.getArray("success")?.size() ?: 0 } catch (e: Exception) { 0 }
+                                Thread.sleep(700)
+                                Handler(Looper.getMainLooper()).post {
+                                    if (killedCount > 0) {
+                                        Toast.makeText(reactContext, "$killedCount aplikasi berhasil di-kill!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    try {
+                                        reactContext
+                                            .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                                            .emit("onAppsFrozen", null)
+                                    } catch (e: Exception) {}
+                                    updateDisplay()
+                                }
                             }
                         }
                     } catch (e: Exception) {}
@@ -60,7 +66,7 @@ class QuickActionReceiver(
             "com.killapp.ACTION_POSTPONE_PKG" -> {
                 val targetPkg = intent.getStringExtra("pkg") ?: return
                 postponedPackages.add(targetPkg)
-                prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
+                prefs.edit().putStringSet("postponedPackages", java.util.HashSet(postponedPackages)).apply()
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(reactContext, "Kill ditunda sementara", Toast.LENGTH_SHORT).show()
                 }
@@ -70,18 +76,22 @@ class QuickActionReceiver(
                 val targetPkg = intent.getStringExtra("pkg") ?: return
                 val targetName = intent.getStringExtra("name") ?: targetPkg
                 postponedPackages.remove(targetPkg)
-                prefs.edit().putStringSet("postponedPackages", postponedPackages).apply()
+                prefs.edit().putStringSet("postponedPackages", java.util.HashSet(postponedPackages)).apply()
                 
                 Thread {
                     try {
-                        val mode = prefs.getString("workingMode", "shizuku") ?: "shizuku"
-                        val isReady = if (mode == "root") true else CommandExecutor.isShizukuReady()
+                        val isReady = CommandExecutor.isReady(reactContext)
                         if (isReady) {
-                            val success = (CommandExecutor.executeCommand(reactContext, "am force-stop $targetPkg") == 0)
+                            val array = com.facebook.react.bridge.Arguments.createArray()
+                            array.pushString(targetPkg)
+                            
+                            val result = com.killapp.core.execution.ProcessKiller.killApps(reactContext, array)
+                            val succeeded = try { result.getArray("success")?.size() ?: 0 } catch (e: Exception) { 0 } > 0
                             Thread.sleep(700)
                             Handler(Looper.getMainLooper()).post {
-                                val msg = if (success) "$targetName berhasil di-kill!" else "Gagal mematikan $targetName."
-                                Toast.makeText(reactContext, msg, Toast.LENGTH_SHORT).show()
+                                if (succeeded) {
+                                    Toast.makeText(reactContext, "$targetName berhasil di-kill!", Toast.LENGTH_SHORT).show()
+                                }
                                 try {
                                     reactContext
                                         .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
