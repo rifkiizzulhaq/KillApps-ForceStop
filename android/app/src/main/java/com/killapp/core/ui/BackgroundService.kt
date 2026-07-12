@@ -183,12 +183,6 @@ class BackgroundService : Service() {
                     val colonIdx = entry.lastIndexOf(':')
                     if (colonIdx < 0) { toRemove.add(entry); continue }
                     val pkg = entry.substring(0, colonIdx)
-                    
-                    if (ProtectionFilter.isAppOpsExempt(this, pkg)) {
-                        toRemove.add(entry)
-                        Thread { ProcessKiller.resetAppOps(this, pkg) }.start()
-                        continue
-                    }
 
                     val killTime = entry.substring(colonIdx + 1).toLongOrNull() ?: 0L
                     if (now - killTime > expireMs) { toRemove.add(entry); continue }
@@ -264,73 +258,77 @@ class BackgroundService : Service() {
     private fun startMonitoring() {
         handler?.removeCallbacksAndMessages(null)
         handler?.post(object : Runnable {
+            private var tickCount = 0
             override fun run() {
-                val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
-                val enabled = prefs.getBoolean("quickActionNotifEnabled", false)
-                val isModeAlive = CommandExecutor.isReady(this@BackgroundService)
+                Thread {
+                    try {
+                        val prefs = getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
+                        val enabled = prefs.getBoolean("quickActionNotifEnabled", false)
+                        val isModeAlive = CommandExecutor.isReady(this@BackgroundService)
 
-                val isWatchlistActive = ProcessKiller.isReKillWatchlistEnabled(this@BackgroundService) && prefs.getBoolean("reKillWatchlistActive", false)
-                val isAnyActive = enabled ||
-                        prefs.getBoolean("autoHibernationEnabled", false) ||
-                        prefs.getBoolean("bedtimeShield", false) ||
-                        prefs.getBoolean("emergencyTrigger", false) ||
-                        prefs.getBoolean("ramCrunchSlayer", false) ||
-                        prefs.getInt("autoKillScheduler", 0) > 0 ||
-                        isWatchlistActive
+                        val isWatchlistActive = ProcessKiller.isReKillWatchlistEnabled(this@BackgroundService) && prefs.getBoolean("reKillWatchlistActive", false)
+                        val isAnyActive = enabled ||
+                                prefs.getBoolean("autoHibernationEnabled", false) ||
+                                prefs.getBoolean("bedtimeShield", false) ||
+                                prefs.getBoolean("emergencyTrigger", false) ||
+                                prefs.getBoolean("ramCrunchSlayer", false) ||
+                                prefs.getInt("autoKillScheduler", 0) > 0 ||
+                                isWatchlistActive
 
-                if (isAnyActive && isModeAlive) {
-                    val targets = prefs.getStringSet("autoHibernationTargets", setOf()) ?: setOf()
-                    val allTargets = targets
-                    val postponed = prefs.getStringSet("postponedPackages", setOf()) ?: setOf()
-                    helper.updateDisplay(
-                        enabled,
-                        allTargets,
-                        postponed,
-                        false
-                    )
+                        if (isAnyActive && isModeAlive) {
+                            val targets = prefs.getStringSet("autoHibernationTargets", setOf()) ?: setOf()
+                            val postponed = prefs.getStringSet("postponedPackages", setOf()) ?: setOf()
+                            helper.updateDisplay(enabled, targets, postponed, false)
 
-                    val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(this@BackgroundService)
-                    if (activeMediaPkgs.isNotEmpty()) {
-                        Thread {
-                            for (mediaPkg in activeMediaPkgs) {
-                                ProcessKiller.resetAppOps(this@BackgroundService, mediaPkg)
+                            val activeMediaPkgs = ProtectionFilter.getActiveMediaPackages(this@BackgroundService)
+                            if (activeMediaPkgs.isNotEmpty()) {
+                                for (mediaPkg in activeMediaPkgs) {
+                                    ProcessKiller.resetAppOps(this@BackgroundService, mediaPkg)
+                                }
                             }
-                        }.start()
-                    }
 
-                    val ramCrunch = prefs.getBoolean("ramCrunchSlayer", false)
-                    if (ramCrunch) {
-                        try {
-                            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                            val memInfo = android.app.ActivityManager.MemoryInfo()
-                            am.getMemoryInfo(memInfo)
-                            val ratio = memInfo.availMem.toDouble() / memInfo.totalMem.toDouble()
-                            val lastCrunch = prefs.getLong("lastRamCrunchTime", 0L)
-                            val now = System.currentTimeMillis()
-                            if (ratio < 0.15 && now - lastCrunch > 15 * 60 * 1000L && !isKillingInProgress.get()) {
-                                prefs.edit().putLong("lastRamCrunchTime", now).apply()
-                                triggerAutoKill(targets)
+                            val ramCrunch = prefs.getBoolean("ramCrunchSlayer", false)
+                            if (ramCrunch) {
+                                try {
+                                    val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                                    val memInfo = android.app.ActivityManager.MemoryInfo()
+                                    am.getMemoryInfo(memInfo)
+                                    val ratio = memInfo.availMem.toDouble() / memInfo.totalMem.toDouble()
+                                    val lastCrunch = prefs.getLong("lastRamCrunchTime", 0L)
+                                    val now = System.currentTimeMillis()
+                                    if (ratio < 0.15 && now - lastCrunch > 15 * 60 * 1000L && !isKillingInProgress.get()) {
+                                        prefs.edit().putLong("lastRamCrunchTime", now).apply()
+                                        triggerAutoKill(targets)
+                                    }
+                                } catch (e: Exception) {}
                             }
-                        } catch (e: Exception) {}
-                    }
 
-                    val intervalHours = prefs.getInt("autoKillScheduler", 0)
-                    if (intervalHours > 0) {
-                        val lastScheduled = prefs.getLong("lastScheduledKillTime", 0L)
-                        val now = System.currentTimeMillis()
-                        if (lastScheduled == 0L) {
-                            prefs.edit().putLong("lastScheduledKillTime", now).apply()
-                        } else if (now - lastScheduled > intervalHours * 3600 * 1000L && !isKillingInProgress.get()) {
-                            prefs.edit().putLong("lastScheduledKillTime", now).apply()
-                            triggerAutoKill(targets)
+                            val intervalHours = prefs.getInt("autoKillScheduler", 0)
+                            if (intervalHours > 0) {
+                                val lastScheduled = prefs.getLong("lastScheduledKillTime", 0L)
+                                val now = System.currentTimeMillis()
+                                if (lastScheduled == 0L) {
+                                    prefs.edit().putLong("lastScheduledKillTime", now).apply()
+                                } else if (now - lastScheduled > intervalHours * 3600 * 1000L && !isKillingInProgress.get()) {
+                                    prefs.edit().putLong("lastScheduledKillTime", now).apply()
+                                    triggerAutoKill(targets)
+                                }
+                            }
+
+                            tickCount++
+                            if (tickCount % 2 == 0) {
+                                checkReKillWatchlist()
+                            }
+
+                            handler?.postDelayed(this, 4000)
+                        } else {
+                            helper.updateDisplay(false, setOf(), setOf(), true)
+                            stopSelf()
                         }
+                    } catch (e: Exception) {
+                        handler?.postDelayed(this, 4000)
                     }
-
-                    handler?.postDelayed(this, 2000)
-                } else {
-                    helper.updateDisplay(false, setOf(), setOf(), true)
-                    stopSelf()
-                }
+                }.start()
             }
         })
     }
