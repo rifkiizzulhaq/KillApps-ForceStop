@@ -71,7 +71,13 @@ export const AddAppsScreen: React.FC = () => {
 
 	const runningApps = apps
 		.filter((app) => !hibernationList.includes(app.packageName))
-		.filter((app) => !CRITICAL_PACKAGES.has(app.packageName))
+		.filter(
+			(app) =>
+				!(
+					settings.smartHibernation &&
+					(app.isSmartProtected || CRITICAL_PACKAGES.has(app.packageName))
+				),
+		)
 		.filter((app) => (settings.hibernateSystemApps ? true : !app.isSystemApp))
 		.filter((app) => !app.isStopped)
 		.filter(
@@ -82,7 +88,13 @@ export const AddAppsScreen: React.FC = () => {
 
 	const otherApps = apps
 		.filter((app) => !hibernationList.includes(app.packageName))
-		.filter((app) => !CRITICAL_PACKAGES.has(app.packageName))
+		.filter(
+			(app) =>
+				!(
+					settings.smartHibernation &&
+					(app.isSmartProtected || CRITICAL_PACKAGES.has(app.packageName))
+				),
+		)
 		.filter((app) => (settings.hibernateSystemApps ? true : !app.isSystemApp))
 		.filter((app) => app.isStopped)
 		.filter(

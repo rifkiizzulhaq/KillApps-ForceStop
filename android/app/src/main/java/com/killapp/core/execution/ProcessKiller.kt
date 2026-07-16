@@ -49,7 +49,7 @@ object ProcessKiller {
         for (cmd in cmds) CommandExecutor.executeCommand(context, cmd)
     }
 
-    private fun recordShallowKill(context: Context, pkg: String) {
+    fun recordShallowKill(context: Context, pkg: String) {
         try {
             val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
             val set = (prefs.getStringSet("shallow_killed_set", setOf()) ?: setOf()).toMutableSet()
@@ -110,6 +110,7 @@ object ProcessKiller {
                 if (success) {
                     successList.pushString(pkg)
                     addToReKillWatchlist(context, pkg)
+                    recordShallowKill(context, pkg)
                     if (useShallow) {
                         recordShallowKill(context, pkg)
                         if (deepTrim) {

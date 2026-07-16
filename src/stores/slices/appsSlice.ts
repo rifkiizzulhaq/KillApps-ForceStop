@@ -50,9 +50,10 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			let targetsToKill = hibernationList;
 
 			if (settings.smartHibernation) {
-				targetsToKill = targetsToKill.filter(
-					(pkg) => !CRITICAL_PACKAGES.has(pkg),
-				);
+				targetsToKill = targetsToKill.filter((pkg) => {
+					const app = get().apps.find((a) => a.packageName === pkg);
+					return !(app?.isSmartProtected || CRITICAL_PACKAGES.has(pkg));
+				});
 			}
 
 			let ignoredCount = 0;
@@ -116,9 +117,13 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			}));
 
 			const { hibernationList } = get();
-			const cleanHibernationList = hibernationList.filter(
-				(pkg) => !CRITICAL_PACKAGES.has(pkg),
-			);
+			const cleanHibernationList = hibernationList.filter((pkg) => {
+				const appInfo = apps.find((a) => a.packageName === pkg);
+				return (
+					!CRITICAL_PACKAGES.has(pkg) &&
+					!(appInfo?.isSystemApp && appInfo?.isSmartProtected)
+				);
+			});
 			if (cleanHibernationList.length !== hibernationList.length) {
 				set({ hibernationList: cleanHibernationList });
 			}
@@ -170,9 +175,10 @@ export const createAppsSlice: StateCreator<AppState, [], [], AppsSlice> = (
 			set({ isKilling: true, killMessage: null });
 
 			if (settings.smartHibernation) {
-				selectedPkgs = selectedPkgs.filter(
-					(pkg) => !CRITICAL_PACKAGES.has(pkg),
-				);
+				selectedPkgs = selectedPkgs.filter((pkg) => {
+					const app = get().apps.find((a) => a.packageName === pkg);
+					return !(app?.isSmartProtected || CRITICAL_PACKAGES.has(pkg));
+				});
 			}
 
 			let ignoredCount = 0;

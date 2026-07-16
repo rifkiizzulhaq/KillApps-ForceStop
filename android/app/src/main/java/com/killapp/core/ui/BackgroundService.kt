@@ -231,7 +231,7 @@ class BackgroundService : Service() {
                         val firstDetected = suspiciousPackages[pkg]
                         if (firstDetected == null) {
                             suspiciousPackages[pkg] = now
-                        } else if (now - firstDetected > 15000L) {
+                        } else if (now - firstDetected > 3000L) {
                             toReKill.add(pkg)
                             suspiciousPackages.remove(pkg)
                         }
@@ -320,13 +320,13 @@ class BackgroundService : Service() {
                                 checkReKillWatchlist()
                             }
 
-                            handler?.postDelayed(this, 4000)
+                            handler?.postDelayed(this, 1500)
                         } else {
                             helper.updateDisplay(false, setOf(), setOf(), true)
                             stopSelf()
                         }
                     } catch (e: Exception) {
-                        handler?.postDelayed(this, 4000)
+                        handler?.postDelayed(this, 1500)
                     }
                 }.start()
             }

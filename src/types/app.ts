@@ -6,6 +6,7 @@ export interface AppInfo {
 	isGcm?: boolean;
 	isStopped?: boolean;
 	isMediaApp?: boolean;
+	isSmartProtected?: boolean;
 	isSelected?: boolean;
 }
 

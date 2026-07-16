@@ -104,7 +104,7 @@ class NotificationManager(private val context: Context) {
             val activeTargets = autoHibernationTargets.filter { pkg ->
                 if (postponedPackages.contains(pkg)) return@filter false
                 if (ProtectionFilter.isMediaActiveProtected(context, pkg, finerMedia)) return@filter false
-                if (ProtectionFilter.isSmartProtected(context, pkg, smart)) return@filter false
+                if (ProtectionFilter.isQuickActionProtected(context, pkg, smart)) return@filter false
                 try {
                     val info = pm.getApplicationInfo(pkg, 0)
                     val isStopped = (info.flags and ApplicationInfo.FLAG_STOPPED) != 0

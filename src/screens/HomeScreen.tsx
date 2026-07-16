@@ -145,7 +145,10 @@ export const HomeScreen: React.FC = () => {
 		);
 
 	const filterSmart = (app: import("../types/app").AppInfo) =>
-		!(settings?.smartHibernation && CRITICAL_PACKAGES.has(app.packageName));
+		!(
+			settings?.smartHibernation &&
+			(app.isSmartProtected || CRITICAL_PACKAGES.has(app.packageName))
+		);
 
 	const activeApps = targetApps.filter((a) => !a.isStopped && filterSmart(a));
 	const hibernatedApps = targetApps.filter(
@@ -351,7 +354,8 @@ export const HomeScreen: React.FC = () => {
 									disabled={!isModeVerified}
 									isSmartProtected={Boolean(
 										settings?.smartHibernation &&
-											CRITICAL_PACKAGES.has(app.packageName),
+											(app.isSmartProtected ||
+												CRITICAL_PACKAGES.has(app.packageName)),
 									)}
 									isMediaApp={Boolean(
 										settings?.finerMediaDetection && app.isMediaApp,

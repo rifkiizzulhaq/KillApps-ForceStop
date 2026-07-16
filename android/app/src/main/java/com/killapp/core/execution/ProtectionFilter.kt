@@ -62,7 +62,6 @@ object ProtectionFilter {
         if (getDynamicNavigationPackages(context).contains(pkg)) return true
         if (getCameraPackages(context).contains(pkg)) return true
 
-        // Exempt VPNs and apps with background sensitive service declarations
         val pm = context.packageManager
         try {
             val info = pm.getPackageInfo(pkg, PackageManager.GET_SERVICES)
@@ -248,7 +247,9 @@ object ProtectionFilter {
         }
 
         val active = getActiveMediaPackages(_context)
-        if (!active.contains(pkg)) return false
+        if (active.isNotEmpty()) {
+            if (!active.contains(pkg)) return false
+        }
         if (!isAppOpsExempt(_context, pkg) && !isMediaOrAudioApp(_context, pkg)) return false
         return try {
             val info = _context.packageManager.getApplicationInfo(pkg, 0)
@@ -295,48 +296,69 @@ object ProtectionFilter {
                 return it
             }
         }
-        val protectedApps = mutableSetOf<String>()
+        syncGlobalDiagnosticSnapshot(context)
+        return cachedSmartProtectedApps ?: emptySet()
+    }
+
+    private var cachedDynamicCriticalPackages: Set<String>? = null
+    private var lastDynamicCriticalCheckTime: Long = 0L
+
+    @Synchronized
+    fun getDynamicCriticalPackages(context: Context): Set<String> {
+        val now = System.currentTimeMillis()
+        cachedDynamicCriticalPackages?.let {
+            if (now - lastDynamicCriticalCheckTime < 5000L) {
+                return it
+            }
+        }
+        val criticals = mutableSetOf<String>()
+        criticals.addAll(criticalPackages)
         try {
-            val oomOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
-                context, "dumpsys activity oom | grep -E 'TOP|FOREGROUND|fg-service'"
-            )
-            oomOutput.lines().forEach { line ->
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty() && (
-                    trimmed.contains("FOREGROUND") || trimmed.contains("TOP") ||
-                    trimmed.contains("fg-service")
-                )) {
-                    val parts = trimmed.split(":", "/", " ")
-                    for (part in parts) {
-                        if (part.contains(".") && !part.startsWith("com.android.") && !part.startsWith("android.") && part.length > 5) {
-                            val cleanPkg = part.trim(',', '}', '{', ']')
-                            if (cleanPkg.matches(Regex("^[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+$"))) {
-                                protectedApps.add(cleanPkg)
-                            }
-                        }
-                    }
-                }
+            val pm = context.packageManager
+            val defaultIm = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.DEFAULT_INPUT_METHOD)
+            if (!defaultIm.isNullOrEmpty()) {
+                val pkg = defaultIm.substringBefore("/")
+                if (pkg.isNotEmpty()) criticals.add(pkg)
+            }
+            val imIntent = Intent("android.view.InputMethod")
+            pm.queryIntentServices(imIntent, 0).forEach { info ->
+                info.serviceInfo?.packageName?.let { criticals.add(it) }
             }
         } catch (e: Exception) {}
-
         try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            am.runningAppProcesses?.forEach { proc ->
-                val imp = proc.importance
-                if (imp == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
-                    imp == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE) {
-                    proc.pkgList?.forEach { protectedApps.add(it) }
-                }
+            val pm = context.packageManager
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val defaultHome = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            defaultHome?.activityInfo?.packageName?.let { criticals.add(it) }
+            pm.queryIntentActivities(homeIntent, 0).forEach { info ->
+                info.activityInfo?.packageName?.let { criticals.add(it) }
             }
         } catch (e: Exception) {}
-
-        cachedSmartProtectedApps = protectedApps
-        lastSmartCacheTime = now
-        return protectedApps
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val tm = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                tm?.defaultDialerPackage?.let { criticals.add(it) }
+            }
+            val dialIntent = Intent(Intent.ACTION_DIAL)
+            context.packageManager.queryIntentActivities(dialIntent, 0).forEach { info ->
+                info.activityInfo?.packageName?.let { criticals.add(it) }
+            }
+        } catch (e: Exception) {}
+        try {
+            val webviewProvider = android.provider.Settings.Global.getString(context.contentResolver, "webview_provider")
+            if (!webviewProvider.isNullOrEmpty()) {
+                criticals.add(webviewProvider.trim())
+            }
+        } catch (e: Exception) {}
+        cachedDynamicCriticalPackages = criticals
+        lastDynamicCriticalCheckTime = now
+        return criticals
     }
 
     private var cachedForegroundServicePackages: Set<String> = emptySet()
     private var cachedOngoingNotifPackages: Set<String> = emptySet()
+    private var cachedDownloadPackages: Set<String> = emptySet()
+    private var cachedDataSyncPackages: Set<String> = emptySet()
     private var cachedActiveCameraPackages: Set<String> = emptySet()
     private var cachedActiveProjectionPackages: Set<String> = emptySet()
     private var lastGlobalDiagnosticCacheTime: Long = 0L
@@ -352,30 +374,68 @@ object ProtectionFilter {
             pm.queryIntentActivities(intent1, 0).forEach { info ->
                 info.activityInfo?.packageName?.let { cameras.add(it) }
             }
-            val intent2 = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
-            pm.queryIntentActivities(intent2, 0).forEach { info ->
-                info.activityInfo?.packageName?.let { cameras.add(it) }
-            }
         } catch (e: Exception) {}
         cachedCameraPackages = cameras
         return cameras
     }
 
+    fun isCameraApp(context: Context, pkg: String): Boolean {
+        if (pkg.contains("camera", ignoreCase = true)) return true
+        if (getCameraPackages(context).contains(pkg)) return true
+        return false
+    }
+
+    private var cachedTopPackage: String? = null
+    private var lastTopPackageCheckTime: Long = 0L
+
     fun getTopPackage(context: Context): String? {
+        val now = System.currentTimeMillis()
+        if (now - lastTopPackageCheckTime < 700L) {
+            return cachedTopPackage
+        }
+        lastTopPackageCheckTime = now
         try {
-            val output = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
-                context, "dumpsys activity activities | grep -iE 'mResumedActivity|topResumedActivity|ResumedActivity'"
+            var output = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                context, "dumpsys activity activities 2>/dev/null | grep -iE 'Resumed|topResumed'"
             )
-            val regex = Regex("(?:mResumedActivity|topResumedActivity|ResumedActivity)[:=]\\s*ActivityRecord\\{[a-fA-F0-9]+\\s+u\\d+\\s+([a-zA-Z0-9_\\.]+)/")
-            val match = regex.find(output)
-            if (match != null) {
-                return match.groupValues[1]
+            if (output.trim().isEmpty()) {
+                output = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                    context, "dumpsys window windows 2>/dev/null | grep -iE 'mCurrentFocus|mFocusedApp|mFocusedWindow'"
+                )
             }
-        } catch (e: Exception) {}
-        return null
+            val regex = Regex("([a-zA-Z0-9_]+(?:\\.[a-zA-Z0-9_]+)+)/")
+            val matches = regex.findAll(output)
+            for (match in matches) {
+                val pkg = match.groupValues[1]
+                if (pkg != "com.android.systemui" && 
+                    pkg != "android" && 
+                    !pkg.contains("inputmethod") &&
+                    !pkg.contains("launcher")) {
+                    cachedTopPackage = pkg
+                    break
+                }
+            }
+        } catch (e: Exception) {
+            cachedTopPackage = null
+        }
+        return cachedTopPackage
     }
 
     fun isAppTopForeground(context: Context, pkg: String): Boolean {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val processes = am?.runningAppProcesses
+            if (processes != null) {
+                for (proc in processes) {
+                    if (proc.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND && proc.pkgList != null) {
+                        for (p in proc.pkgList) {
+                            if (p == pkg) return true
+                        }
+                    }
+                }
+                return false
+            }
+        } catch (e: Exception) {}
         val top = getTopPackage(context)
         return top != null && top == pkg
     }
@@ -383,39 +443,131 @@ object ProtectionFilter {
     @Synchronized
     private fun syncGlobalDiagnosticSnapshot(context: Context) {
         val now = System.currentTimeMillis()
-        if (now - lastGlobalDiagnosticCacheTime < 1200L && cachedOngoingNotifPackages.isNotEmpty()) return
+        if (now - lastGlobalDiagnosticCacheTime < 700L && cachedOngoingNotifPackages.isNotEmpty()) return
         lastGlobalDiagnosticCacheTime = now
 
         try {
-            val notifSet = mutableSetOf<String>()
-            val notifOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
-                context, "dumpsys notification --noredact | grep -E 'NotificationRecord'"
+            val vitalSet = mutableSetOf<String>()
+            val fgServiceSet = mutableSetOf<String>()
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            am.runningAppProcesses?.forEach { proc ->
+                val imp = proc.importance
+                if (imp == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                    imp == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE) {
+                    proc.pkgList?.forEach { 
+                        vitalSet.add(it)
+                        if (imp == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE) {
+                            fgServiceSet.add(it)
+                        }
+                    }
+                }
+            }
+            val oomOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                context, "dumpsys activity oom 2>/dev/null | head -n 120"
             )
-            val browserPkgs = getBrowserPackages(context)
-            notifOutput.lines().forEach { line ->
-                val t = line.trim()
-                if (t.contains("NotificationRecord") && t.contains("pkg=")) {
-                    val pkg = t.substringAfter("pkg=").substringBefore(" ").substringBefore("}").trim()
-                    val isOngoing = t.contains("ONGOING_EVENT") || t.contains("FOREGROUND_SERVICE") || t.contains("NO_CLEAR")
-                    if (isOngoing) {
-                        val isBrowser = browserPkgs.contains(pkg)
-                        if (!isBrowser) {
-                            notifSet.add(pkg)
-                        } else {
-                            val lowercaseLine = t.lowercase()
-                            val isDownloadChannel = lowercaseLine.contains("channel=download") || 
-                                                    lowercaseLine.contains("channel=unduhan") || 
-                                                    lowercaseLine.contains("channel=progress") || 
-                                                    lowercaseLine.contains("channel=kemajuan") || 
-                                                    lowercaseLine.contains("channel=transfer")
-                            if (isDownloadChannel) {
-                                notifSet.add(pkg)
+            oomOutput.lines().forEach { line ->
+                val trimmed = line.trim()
+                if (trimmed.isNotEmpty() && (
+                    trimmed.contains("top", ignoreCase = true) || trimmed.contains("foreground", ignoreCase = true) ||
+                    trimmed.contains("fg-service", ignoreCase = true) || trimmed.contains("vis", ignoreCase = true)
+                )) {
+                    val parts = trimmed.split(":", "/", " ", "=")
+                    for (part in parts) {
+                        if (part.contains(".") && !part.startsWith("com.android.") && !part.startsWith("android.") && part.length > 4) {
+                            val cleanPkg = part.trim(',', '}', '{', ']', '(', ')')
+                            if (cleanPkg.matches(Regex("^[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+$"))) {
+                                vitalSet.add(cleanPkg)
+                                if (trimmed.contains("fg-service", ignoreCase = true)) {
+                                    fgServiceSet.add(cleanPkg)
+                                }
                             }
                         }
                     }
                 }
             }
+            cachedSmartProtectedApps = vitalSet
+            cachedForegroundServicePackages = fgServiceSet
+            lastSmartCacheTime = now
+        } catch (e: Exception) {}
+
+        try {
+            val notifSet = mutableSetOf<String>()
+            val downloadSet = mutableSetOf<String>()
+            val syncSet = mutableSetOf<String>()
+            var notifOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                context, "dumpsys notification --noredact 2>/dev/null"
+            )
+            if (notifOutput.trim().isEmpty() || notifOutput.contains("unrecognized option")) {
+                notifOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                    context, "dumpsys notification 2>/dev/null"
+                )
+            }
+            val browserPkgs = getBrowserPackages(context)
+            var currentPkg: String? = null
+            var recordOngoing = false
+            var recordHasProgress = false
+            var recordCategoryProgress = false
+            var recordCategoryTransport = false
+
+            fun flushCurrentRecord() {
+                if (currentPkg != null) {
+                    val isMediaPkg = isMediaOrAudioApp(context, currentPkg!!) || browserPkgs.contains(currentPkg!!)
+                    if (recordOngoing) {
+                        if (recordCategoryProgress || (recordHasProgress && !isMediaPkg)) {
+                            downloadSet.add(currentPkg!!)
+                        }
+                        if (recordCategoryTransport && !isMediaPkg) {
+                            syncSet.add(currentPkg!!)
+                        }
+                        if (!browserPkgs.contains(currentPkg!!) && !recordHasProgress && !recordCategoryProgress && !isMediaPkg) {
+                            notifSet.add(currentPkg!!)
+                        }
+                    } else if (recordCategoryProgress || (recordHasProgress && !isMediaPkg)) {
+                        downloadSet.add(currentPkg!!)
+                    }
+                }
+            }
+
+            notifOutput.lines().forEach { line ->
+                val t = line.trim()
+                if (t.contains("NotificationRecord") || t.startsWith("pkg=")) {
+                    if (t.contains("pkg=")) {
+                        val pkg = t.substringAfter("pkg=").substringBefore(" ").substringBefore(")").substringBefore("}").trim()
+                        if (pkg.contains(".") && pkg.length > 3) {
+                            if (currentPkg != pkg || t.contains("NotificationRecord")) {
+                                flushCurrentRecord()
+                                currentPkg = pkg
+                                recordOngoing = false
+                                recordHasProgress = false
+                                recordCategoryProgress = false
+                                recordCategoryTransport = false
+                            }
+                        }
+                    }
+                }
+                if (currentPkg != null) {
+                    val lower = t.lowercase()
+                    if (t.contains("ONGOING_EVENT") || t.contains("FOREGROUND_SERVICE") || t.contains("NO_CLEAR") ||
+                        t.contains("FLAG_ONGOING_EVENT") || t.contains("FLAG_FOREGROUND_SERVICE") || t.contains("FLAG_NO_CLEAR")) {
+                        recordOngoing = true
+                    }
+                    if (t.contains("progress=") || t.contains("android.progress=") || t.contains("mProgress=") ||
+                        t.contains("mProgressMax=") || t.contains("indeterminate=true") || t.contains("hasProgress=true") ||
+                        lower.contains("progress=")) {
+                        recordHasProgress = true
+                    }
+                    if (t.contains("cat=progress") || t.contains("category=progress") || t.contains("cat=sys") || t.contains("category=sys")) {
+                        recordCategoryProgress = true
+                    }
+                    if (lower.contains("datasync") || lower.contains("data_sync") || lower.contains("file_transfer") || lower.contains("torrent")) {
+                        recordCategoryTransport = true
+                    }
+                }
+            }
+            flushCurrentRecord()
             cachedOngoingNotifPackages = notifSet
+            cachedDownloadPackages = downloadSet
+            cachedDataSyncPackages = syncSet
         } catch (e: Exception) {}
 
         try {
@@ -425,10 +577,11 @@ object ProtectionFilter {
             )
             val pkgRegex = Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+")
             cameraOutput.lines().forEach { line ->
-                if (line.contains("Active Camera Clients")) {
-                    pkgRegex.findAll(line).forEach { match -> cameraSet.add(match.value) }
-                } else if (line.contains("Device") && line.contains("maps to")) {
-                    pkgRegex.findAll(line).forEach { match -> cameraSet.add(match.value) }
+                val lower = line.lowercase()
+                if (lower.contains("client") || lower.contains("active")) {
+                    if (!lower.contains("device") && !lower.contains("maps to")) {
+                        pkgRegex.findAll(line).forEach { match -> cameraSet.add(match.value) }
+                    }
                 }
             }
             cachedActiveCameraPackages = cameraSet
@@ -439,9 +592,14 @@ object ProtectionFilter {
             val projOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
                 context, "dumpsys media.projection 2>/dev/null"
             )
-            val pkgRegex = Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+")
-            projOutput.lines().forEach { line ->
-                pkgRegex.findAll(line).forEach { match -> projSet.add(match.value) }
+            val lower = projOutput.lowercase()
+            if (lower.contains("active=true") || lower.contains("state=active") || lower.contains("state=1") || lower.contains("isactive: true")) {
+                val pkgRegex = Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+")
+                projOutput.lines().forEach { line ->
+                    if (line.lowercase().contains("package:") || line.lowercase().contains("pkg=")) {
+                        pkgRegex.findAll(line).forEach { match -> projSet.add(match.value) }
+                    }
+                }
             }
             cachedActiveProjectionPackages = projSet
         } catch (e: Exception) {}
@@ -449,26 +607,30 @@ object ProtectionFilter {
 
     private fun isDynamicActiveVpn(context: Context, pkg: String): Boolean {
         try {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-            val activeNetwork = cm.activeNetwork
-            val capabilities = cm.getNetworkCapabilities(activeNetwork)
-            val hasVpn = capabilities?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) ?: false
-            if (!hasVpn) return false
-
             val pm = context.packageManager
             val info = try { pm.getPackageInfo(pkg, PackageManager.GET_SERVICES) } catch (e: Exception) { null }
             if (info != null) {
-                var hasVpnPermission = false
+                var hasVpnService = false
                 info.services?.forEach { srv ->
-                    if (srv.permission == "android.permission.BIND_VPN_SERVICE") {
-                        hasVpnPermission = true
+                    if (srv.permission == "android.permission.BIND_VPN_SERVICE" || 
+                        srv.name?.contains("VpnService", ignoreCase = true) == true ||
+                        srv.name?.contains("Vpn", ignoreCase = true) == true ||
+                        srv.name?.contains("WarpService", ignoreCase = true) == true ||
+                        srv.name?.contains("DnsService", ignoreCase = true) == true) {
+                        hasVpnService = true
                     }
                 }
-                if (hasVpnPermission) {
+                if (hasVpnService) {
+                    if (cachedForegroundServicePackages.contains(pkg) || 
+                        cachedOngoingNotifPackages.contains(pkg) || 
+                        isAppTopForeground(context, pkg)) {
+                        return true
+                    }
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                     val processes = am.runningAppProcesses
                     processes?.forEach { proc ->
-                        if (proc.pkgList?.contains(pkg) == true) {
+                        if (proc.pkgList?.contains(pkg) == true && 
+                            proc.importance <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE) {
                             return true
                         }
                     }
@@ -480,54 +642,79 @@ object ProtectionFilter {
 
     private fun isDynamicDataSyncProtected(context: Context, pkg: String): Boolean {
         syncGlobalDiagnosticSnapshot(context)
-        return cachedOngoingNotifPackages.contains(pkg)
+        return cachedDataSyncPackages.contains(pkg)
     }
 
-    fun isSmartProtected(context: Context, pkg: String, smart: Boolean): Boolean {
-        if (criticalPackages.contains(pkg)) return true
-        if (!smart) return false
+    private fun isDynamicDownloadProtected(context: Context, pkg: String): Boolean {
+        syncGlobalDiagnosticSnapshot(context)
+        if (cachedDownloadPackages.contains(pkg)) return true
+        if (pkg == "com.android.providers.downloads" || pkg == "com.android.providers.downloads.ui") {
+            try {
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? android.app.DownloadManager
+                if (dm != null) {
+                    val query = android.app.DownloadManager.Query().setFilterByStatus(android.app.DownloadManager.STATUS_RUNNING)
+                    val cursor = dm.query(query)
+                    if (cursor != null) {
+                        val hasRunning = cursor.moveToFirst()
+                        cursor.close()
+                        if (hasRunning) return true
+                    }
+                }
+            } catch (e: Exception) {}
+        } else if (cachedForegroundServicePackages.contains(pkg) || getBrowserPackages(context).contains(pkg)) {
+            if (getBrowserPackages(context).contains(pkg)) {
+                return false
+            }
+            try {
+                val srvOutput = com.killapp.core.command.CommandExecutor.executeCommandWithOutput(
+                    context, "dumpsys activity services $pkg 2>/dev/null | head -n 60"
+                )
+                val hasDataSyncType = srvOutput.contains("dataSync") || srvOutput.contains("data_sync") || (srvOutput.contains("specialUse") && !isMediaOrAudioApp(context, pkg))
+                val isForegroundActive = srvOutput.contains("isForeground=true") || srvOutput.contains("startRequested=true") || srvOutput.contains("ServiceRecord{")
+                if (hasDataSyncType && isForegroundActive) {
+                    if (isMediaOrAudioApp(context, pkg) && !srvOutput.contains("dataSync") && !srvOutput.contains("data_sync")) {
+                        return false
+                    }
+                    return true
+                }
+            } catch (e: Exception) {}
+        }
+        return false
+    }
 
-        try {
-            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION) return true
-        } catch (e: Exception) {}
-
+    private fun isDynamicCategoryProtected(context: Context, pkg: String, isTop: Boolean): Boolean {
         if (isDynamicActiveVpn(context, pkg)) return true
+
+        syncGlobalDiagnosticSnapshot(context)
+
+        if (isDynamicDownloadProtected(context, pkg)) return true
 
         if (isDynamicDataSyncProtected(context, pkg)) return true
 
-        val isTop = isAppTopForeground(context, pkg)
-
         if (getDynamicNavigationPackages(context).contains(pkg)) {
-            syncGlobalDiagnosticSnapshot(context)
             val hasNotif = cachedOngoingNotifPackages.contains(pkg)
-            if (isTop || hasNotif) return true
+            if (!isTop && hasNotif) return true
         }
 
-        if (getCameraPackages(context).contains(pkg) && isTop) return true
+        if (isCameraApp(context, pkg) && isTop) return true
 
-        syncGlobalDiagnosticSnapshot(context)
         if (cachedActiveCameraPackages.contains(pkg)) return true
 
         if (cachedActiveProjectionPackages.isNotEmpty() && cachedActiveProjectionPackages.contains(pkg)) return true
 
-        val pm = context.packageManager
-        if (cachedForegroundServicePackages.contains(pkg) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val info = pm.getPackageInfo(pkg, PackageManager.GET_SERVICES)
-                info.services?.forEach { srv ->
-                    val fgType = srv.foregroundServiceType
-                    if (fgType != 0 && (fgType and android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION) != 0) {
-                        return true
-                    }
+        try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION) {
+                if (cachedForegroundServicePackages.contains(pkg) || cachedOngoingNotifPackages.contains(pkg) || isTop) {
+                    return true
                 }
-            } catch (e: Exception) {}
-        }
+            }
+        } catch (e: Exception) {}
+
+        val pm = context.packageManager
+
         val hasRecordAudio = pm.checkPermission(android.Manifest.permission.RECORD_AUDIO, pkg) == PackageManager.PERMISSION_GRANTED
         if (hasRecordAudio) {
-            val activeAudio = getActiveMediaPackages(context)
-            if (activeAudio.contains(pkg)) return true
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 try {
                     val audioMgr = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -553,6 +740,24 @@ object ProtectionFilter {
         return false
     }
 
+    fun isSmartProtected(context: Context, pkg: String, smart: Boolean): Boolean {
+        if (criticalPackages.contains(pkg)) return true
+        if (!smart) return false
+        if (getDynamicCriticalPackages(context).contains(pkg)) return true
+
+        val isTop = isAppTopForeground(context, pkg)
+        return isDynamicCategoryProtected(context, pkg, isTop)
+    }
+
+    fun isQuickActionProtected(context: Context, pkg: String, smart: Boolean): Boolean {
+        if (criticalPackages.contains(pkg)) return true
+        if (!smart) return false
+        if (getDynamicCriticalPackages(context).contains(pkg)) return true
+
+        val isTop = isAppTopForeground(context, pkg)
+        return isDynamicCategoryProtected(context, pkg, isTop)
+    }
+
     fun isQuarantineProtected(context: Context, pkg: String): Boolean {
         val prefs = context.getSharedPreferences("killapp_prefs", Context.MODE_PRIVATE)
         val quarantined = prefs.getStringSet("quarantinePackages", setOf()) ?: setOf()
@@ -568,6 +773,31 @@ object ProtectionFilter {
             }
         } catch (e: Exception) {}
         return false
+    }
+
+    @Synchronized
+    fun resetCache() {
+        cachedBrowserPackages = null
+        cachedActiveMediaPackages = null
+        lastActiveMediaCheckTime = 0L
+        cachedPlayingPackages = emptySet()
+        lastPlayingPackagesOk = false
+        lastPlayingCheckTime = 0L
+        cachedNavigationPackages = null
+        cachedSmartProtectedApps = null
+        lastSmartCacheTime = 0L
+        cachedForegroundServicePackages = emptySet()
+        cachedOngoingNotifPackages = emptySet()
+        cachedDownloadPackages = emptySet()
+        cachedDataSyncPackages = emptySet()
+        cachedActiveCameraPackages = emptySet()
+        cachedActiveProjectionPackages = emptySet()
+        lastGlobalDiagnosticCacheTime = 0L
+        cachedCameraPackages = null
+        cachedTopPackage = null
+        lastTopPackageCheckTime = 0L
+        cachedDynamicCriticalPackages = null
+        lastDynamicCriticalCheckTime = 0L
     }
 }
 
